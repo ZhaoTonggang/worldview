@@ -153,7 +153,7 @@
     "sass-loader": "^10.1.0",
     "selenium-server-standalone-jar": "^3.141.59",
     "shelljs": "^0.8.2",
-    "showdown": "^1.9.1",
+    "showdown": "^2.1.0",
     "stylelint": "^13.2.0",
     "tar": "^6.0.1",
     "terser-webpack-plugin": "^4.2.3",
