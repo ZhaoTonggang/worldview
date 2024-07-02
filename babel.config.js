@@ -1,26 +1,20 @@
 module.exports = {
   presets: [
-    [
-      '@babel/preset-env',
-      {
-        useBuiltIns: 'entry',
-        corejs: '2.0',
-
-      }],
-    [
-      '@babel/preset-react',
-      {
-        useBuiltIns: 'entry',
-        corejs: '2.0',
-      },
-    ],
+    '@babel/preset-env',
+    '@babel/preset-react'
   ],
   plugins: [
     [
-      '@babel/plugin-proposal-class-properties',
+      '@babel/plugin-transform-class-properties',
       {
-        loose: true,
-      },
+        loose: true
+      }
     ],
-  ],
-};
+    [
+      '@babel/plugin-transform-private-methods',
+      {
+        loose: true
+      }
+    ]
+  ]
+}

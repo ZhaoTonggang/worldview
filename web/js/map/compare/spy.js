@@ -1,6 +1,6 @@
 import { each as lodashEach } from 'lodash';
 import { getRenderPixel } from 'ol/render';
-import { memoizedDateMonthAbbrev } from '../../modules/compare/selectors';
+import { getCompareDates } from '../../modules/compare/selectors';
 
 let mousePosition = null;
 let spy = null;
@@ -10,42 +10,165 @@ const DEFAULT_RADIUS = 140;
 let radius = DEFAULT_RADIUS;
 let label = null;
 
+/**
+ * Clip everything but the circle
+ * @param {Object} event | Event object
+ */
+const inverseClip = function(event) {
+  const ctx = event.context;
+  ctx.save();
+  ctx.beginPath();
+  if (mousePosition) {
+    // only show a circle around the mouse
+    const pixel = getRenderPixel(event, mousePosition);
+    const offset = getRenderPixel(event, [mousePosition[0] + radius, mousePosition[1]]);
+    const canvasRadius = Math.sqrt(((offset[0] - pixel[0]) ** 2) + ((offset[1] - pixel[1]) ** 2));
+    ctx.arc(pixel[0], pixel[1], canvasRadius, 0, 2 * Math.PI);
+    ctx.closePath();
+    ctx.lineWidth = (5 * canvasRadius) / radius;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.clip();
+    ctx.clearRect(0, 0, offset, offset);
+  }
+};
+
+/**
+ * Clip the circle of a layer so users can see through
+ */
+const clip = function(event) {
+  const ctx = event.context;
+  ctx.save();
+  ctx.beginPath();
+  if (mousePosition) {
+    // only show a circle around the mouse
+    const pixel = getRenderPixel(event, mousePosition);
+    const offset = getRenderPixel(event, [mousePosition[0] + radius, mousePosition[1]]);
+    const canvasRadius = Math.sqrt(((offset[0] - pixel[0]) ** 2) + ((offset[1] - pixel[1]) ** 2));
+    ctx.arc(pixel[0], pixel[1], canvasRadius, 0, 2 * Math.PI);
+    ctx.lineWidth = (5 * canvasRadius) / radius;
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.stroke();
+  }
+  ctx.clip();
+};
+
+const restore = function(event) {
+  const ctx = event.context;
+  ctx.restore();
+};
+
+/**
+ * Layers need to be inversely clipped so that they can't be seen through
+ * the other layergroup in cases where the layergroups layer opacity is < 100%
+ * @param {Object} layer | Ol Layer object
+ */
+const applyReverseLayerListeners = function(layer) {
+  layer.on('postrender', inverseClip);
+  layer.on('postrender', restore);
+  bottomLayers.push(layer);
+};
+
+/**
+ * Add listeners for layer clipping
+ * @param {Object} layer | Ol Layer object
+ */
+const applyLayerListeners = function(layer) {
+  layer.on('prerender', clip);
+  layer.on('postrender', restore);
+  topLayers.push(layer);
+};
+
+/**
+ * Remove all listeners from layer group
+ * @param {Array} layers | Layer group
+ */
+const removeListenersFromLayers = function(layers) {
+  lodashEach(layers, (layer) => {
+    layer.un('prerender', clip);
+    layer.un('postrender', restore);
+  });
+};
+
+/**
+ * Remove all listeners from layer group
+ * @param {Array} layers | Layer group
+ */
+const removeInverseListenersFromLayers = function(layers) {
+  lodashEach(layers, (layer) => {
+    layer.un('prerender', inverseClip);
+    layer.un('postrender', restore);
+  });
+};
+
+/**
+ * Recursively apply listeners to layers
+ * @param {Object} layer | Layer or layer Group obj
+ * @param {Object} map | OL Map Object
+ * @param {Function} callback | Function that will apply event listeners to layer
+ */
+const applyEventsToBaseLayers = function(layer, map, callback) {
+  const layers = layer.get('layers');
+  if (layers) {
+    lodashEach(layers.getArray(), (layer) => {
+      applyEventsToBaseLayers(layer, map, callback);
+    });
+  } else {
+    callback(layer);
+  }
+};
+
+const isCompareA = (state) => state.compare.isCompareA;
+
+const getDateText = function(state) {
+  const isBInside = isCompareA(state);
+  const { dateA, dateB } = getCompareDates(state);
+  const isSameDate = dateA === dateB;
+  let innerHtml = isBInside ? 'B' : 'A';
+  if (!isSameDate) {
+    const dateText = isBInside ? dateB : dateA;
+    innerHtml += `: <span class="monospace">${dateText}</span>`;
+  }
+  return innerHtml;
+};
+
 export default class Spy {
-  constructor(olMap, state) {
+  constructor(olMap, store) {
     this.mapCase = document.getElementById('wv-map');
     this.map = olMap;
+    const state = store.getState();
     const isBInside = state.compare.isCompareA;
     this.isBInside = isBInside;
-    this.create(state);
+    this.create(store);
   }
 
   /**
    * Init spy
    * @param {Boolean} isBInside | B is the spy value -- true|false
    */
-  create(state) {
+  create(store) {
+    const state = store.getState();
     const isBInside = isCompareA(state);
     spy = this.addSpy(this.map, state);
     this.isBInside = isBInside;
-    this.update(state);
+    this.update(store);
   }
 
   /**
    * Update spy
    * @param {Boolean} isBInside | B is the spy value -- true|false
    */
-  update(state) {
+  update(store) {
+    const state = store.getState();
     const isBInside = isCompareA(state);
-    const { dateA, dateB } = memoizedDateMonthAbbrev(state)();
+    const { dateA, dateB } = getCompareDates(state);
     if (dateA !== this.dateA || dateB !== this.dateB || dateA === dateB) {
-      const insideText = getDateText(state);
-      label.innerText = insideText;
+      label.innerHTML = getDateText(state);
     }
     this.dateA = dateA;
     this.dateB = dateB;
     if (this.isBInside !== isBInside) {
       this.destroy();
-      this.create(state);
+      this.create(store);
     } else {
       const mapLayers = this.map.getLayers().getArray();
       applyEventsToBaseLayers(
@@ -108,11 +231,10 @@ export default class Spy {
    * @param {Boolean} isBInside | B is the spy value -- true|false
    */
   addSpy(map, state) {
-    const insideText = getDateText(state);
     label = document.createElement('span');
     label.className = 'ab-spy-span inside-label';
     label.style.display = 'none';
-    label.appendChild(document.createTextNode(insideText));
+    label.innerHTML = getDateText(state);
 
     this.mapCase.appendChild(label);
     this.mapCase.addEventListener('mousemove', this.updateSpy.bind(this));
@@ -123,116 +245,3 @@ export default class Spy {
     return this.mapCase;
   }
 }
-/**
- * Layers need to be inversely clipped so that they can't be seen through
- * the other layergroup in cases where the layergroups layer opacity is < 100%
- * @param {Object} layer | Ol Layer object
- */
-const applyReverseLayerListeners = function(layer) {
-  layer.on('postrender', inverseClip);
-  layer.on('postrender', restore);
-  bottomLayers.push(layer);
-};
-/**
- * Add listeners for layer clipping
- * @param {Object} layer | Ol Layer object
- */
-const applyLayerListeners = function(layer) {
-  layer.on('prerender', clip);
-  layer.on('postrender', restore);
-  topLayers.push(layer);
-};
-/**
- * Clip everything but the circle
- * @param {Object} event | Event object
- */
-const inverseClip = function(event) {
-  const ctx = event.context;
-  ctx.save();
-  ctx.beginPath();
-  if (mousePosition) {
-    // only show a circle around the mouse
-    const pixel = getRenderPixel(event, mousePosition);
-    const offset = getRenderPixel(event, [mousePosition[0] + radius, mousePosition[1]]);
-    const canvasRadius = Math.sqrt(((offset[0] - pixel[0]) ** 2) + ((offset[1] - pixel[1]) ** 2));
-    ctx.arc(pixel[0], pixel[1], canvasRadius, 0, 2 * Math.PI);
-    ctx.closePath();
-    ctx.lineWidth = (5 * canvasRadius) / radius;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.clip();
-    ctx.clearRect(0, 0, offset, offset);
-  }
-};
-/**
- * Clip the circle of a layer so users can see through
- */
-const clip = function(event) {
-  const ctx = event.context;
-  ctx.save();
-  ctx.beginPath();
-  if (mousePosition) {
-    // only show a circle around the mouse
-    const pixel = getRenderPixel(event, mousePosition);
-    const offset = getRenderPixel(event, [mousePosition[0] + radius, mousePosition[1]]);
-    const canvasRadius = Math.sqrt(((offset[0] - pixel[0]) ** 2) + ((offset[1] - pixel[1]) ** 2));
-    ctx.arc(pixel[0], pixel[1], canvasRadius, 0, 2 * Math.PI);
-    ctx.lineWidth = (5 * canvasRadius) / radius;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.stroke();
-  }
-  ctx.clip();
-};
-const restore = function(event) {
-  const ctx = event.context;
-  ctx.restore();
-};
-/**
- * Remove all listeners from layer group
- * @param {Array} layers | Layer group
- */
-const removeListenersFromLayers = function(layers) {
-  lodashEach(layers, (layer) => {
-    layer.un('prerender', clip);
-    layer.un('postrender', restore);
-  });
-};
-/**
- * Remove all listeners from layer group
- * @param {Array} layers | Layer group
- */
-const removeInverseListenersFromLayers = function(layers) {
-  lodashEach(layers, (layer) => {
-    layer.un('prerender', inverseClip);
-    layer.un('postrender', restore);
-  });
-};
-/**
- * Recursively apply listeners to layers
- * @param {Object} layer | Layer or layer Group obj
- * @param {Object} map | OL Map Object
- * @param {Function} callback | Function that will apply event listeners to layer
- */
-const applyEventsToBaseLayers = function(layer, map, callback) {
-  const layers = layer.get('layers');
-  if (layers) {
-    lodashEach(layers.getArray(), (layer) => {
-      applyEventsToBaseLayers(layer, map, callback);
-    });
-  } else {
-    callback(layer);
-  }
-};
-
-const getDateText = function(state) {
-  const isBInside = isCompareA(state);
-  let insideText = isBInside ? 'B' : 'A';
-  const { dateA, dateB } = memoizedDateMonthAbbrev(state)();
-  const isSameDate = dateA === dateB;
-  if (!isSameDate) {
-    const dateText = isBInside ? dateB : dateA;
-    insideText += `: ${dateText}`;
-  }
-  return insideText;
-};
-
-const isCompareA = (state) => state.compare.isCompareA;

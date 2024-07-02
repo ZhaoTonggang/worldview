@@ -30,6 +30,7 @@ function RecentLayersList(props) {
       <div className="recent-layers-header">
         <h2> Recently Used Layers </h2>
         <Tooltip
+          id="center-align-tooltip"
           className="facet-tooltip-content"
           isOpen={tooltipVisible}
           target="recent-layer-tooltip-target"
@@ -57,7 +58,7 @@ function RecentLayersList(props) {
           </div>
           { !selectedLayer && smallView ? null : !!recentLayers.length && (
           <div className="layer-detail-container layers-all search">
-            <LayerMetadataDetail />
+            <LayerMetadataDetail layer={selectedLayer} />
           </div>
           )}
         </div>
@@ -75,7 +76,7 @@ RecentLayersList.propTypes = {
 };
 
 const mapStateToProps = (state) => {
-  const { browser, productPicker } = state;
+  const { screenSize, productPicker } = state;
   const {
     selectedLayer,
     showMobileFacets,
@@ -83,9 +84,9 @@ const mapStateToProps = (state) => {
   } = productPicker;
 
   return {
-    browser,
-    smallView: browser.screenWidth < 1024,
-    isMobile: browser.lessThan.medium,
+    screenSize,
+    smallView: window.innerWidth < 1024,
+    isMobile: screenSize.isMobileDevice,
     showMobileFacets,
     selectedLayer,
     recentLayers,

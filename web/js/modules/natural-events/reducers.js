@@ -11,6 +11,8 @@ import {
   DESELECT_EVENT,
   SET_EVENTS_FILTER,
   FINISHED_ANIMATING_TO_EVENT,
+  HIGHLIGHT_EVENT,
+  UNHIGHLIGHT_EVENT,
 } from './constants';
 import { CHANGE_TAB as CHANGE_SIDEBAR_TAB } from '../sidebar/constants';
 
@@ -43,8 +45,13 @@ const eventsReducerState = {
     eventObject: null,
     geometryForDate: null,
   },
+  highlighted: {
+    id: '',
+    date: null,
+  },
   active: false,
   showAll: true,
+  showAllTracks: false,
   isAnimatingToEvent: false,
   selectedCategories: [],
   selectedDates: {
@@ -92,6 +99,7 @@ export function eventsReducer(state = eventsReducerState, action) {
       return {
         ...state,
         showAll: action.showAll,
+        showAllTracks: action.showAllTracks,
         selectedCategories: action.categories,
         selectedDates: {
           start: action.start,
@@ -110,6 +118,23 @@ export function eventsReducer(state = eventsReducerState, action) {
       return {
         ...state,
         isAnimatingToEvent: false,
+      };
+    case HIGHLIGHT_EVENT: {
+      const {
+        id, date,
+      } = action;
+      return {
+        ...state,
+        highlighted: {
+          id,
+          date,
+        },
+      };
+    }
+    case UNHIGHLIGHT_EVENT:
+      return {
+        ...state,
+        highlighted: eventsReducerState.highlighted,
       };
     default:
       return state;

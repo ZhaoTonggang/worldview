@@ -31,13 +31,14 @@ import safeLocalStorage from '../../../../util/local-storage';
 
 function BrowseLayers (props) {
   const {
-    browser,
+    isMobile,
     categoryTabNames,
     categoryType,
     mode,
     width,
     recentLayers,
     selectCategoryType,
+    selectedCategoryName,
     selectedProjection,
     toggleMeasurementsTab,
     toggleFeatureTab,
@@ -89,11 +90,11 @@ function BrowseLayers (props) {
       : (
         <div className="search-layers-container browse">
           <div className="layer-list-container browse">
-            <div className="product-outter-list-case">
+            <div className="product-outer-list-case">
               <BrowseLayerList />
             </div>
           </div>
-          { !browser.lessThan.medium && (
+          { !isMobile && (
           <div className="layer-detail-container layers-all browse">
             <MeasurementMetadataDetail />
           </div>
@@ -139,6 +140,7 @@ function BrowseLayers (props) {
       : (
         <div className="recent-layers-mobile-header">
           <Tooltip
+            id="center-align-tooltip"
             className="facet-tooltip-content"
             isOpen={tooltipVisible}
             target="recent-tooltip-target"
@@ -192,30 +194,33 @@ function BrowseLayers (props) {
           </DropdownMenu>
         </Dropdown>
         {recentLayersHeader()}
+
+        {selectedCategoryName && <div className="selected-category">{selectedCategoryName}</div>}
       </div>
     );
   }
 
   return (
     <>
-      { browser.lessThan.medium ? renderMobileDropdown() : renderDesktopTabs() }
+      { isMobile ? renderMobileDropdown() : renderDesktopTabs() }
       {
-        isCategoryDisplay
-          ? (
-            <div className="product-outter-list-case">
-              <CategoryGrid width={width} />
-            </div>
-          ) : renderContent()
-        }
+      isCategoryDisplay
+        ? (
+          <div className={isMobile ? 'product-outer-list-case scrollable-layer-container' : ''}>
+            <CategoryGrid width={width} />
+          </div>
+        ) : renderContent()
+      }
     </>
   );
 }
 
 BrowseLayers.propTypes = {
-  browser: PropTypes.object,
   categoryTabNames: PropTypes.array,
   categoryType: PropTypes.string,
   clearRecentLayers: PropTypes.func,
+  isMobile: PropTypes.bool,
+  selectedCategoryName: PropTypes.string,
   mode: PropTypes.string,
   recentLayers: PropTypes.array,
   selectCategoryType: PropTypes.func,
@@ -247,13 +252,14 @@ const mapDispatchToProps = (dispatch) => ({
 function mapStateToProps(state) {
   const {
     config,
-    browser,
     proj,
     productPicker,
     layers,
+    screenSize,
   } = state;
   const {
     mode,
+    category,
     categoryType,
     listScrollTop,
     selectedMeasurement,
@@ -261,8 +267,9 @@ function mapStateToProps(state) {
     recentLayers,
   } = productPicker;
   return {
-    browser,
+    isMobile: screenSize.isMobileDevice,
     mode,
+    selectedCategoryName: category && category.title,
     categoryType,
     categoryTabNames: config.categoryGroupOrder,
     measurementConfig: config.measurements,

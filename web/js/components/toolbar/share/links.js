@@ -1,55 +1,77 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import HoverTooltip from '../../util/hover-tooltip';
 
-class ShareLinks extends React.Component {
-  onClick(event, type) {
-    const { onClick } = this.props;
+const ShareLinks = function ({ isMobile, onClick }) {
+  const handleClick = (event, type) => {
     event.preventDefault();
     onClick(type);
-  }
-
-  render() {
-    return (
-      <div id="social-share" className="social-share">
-        <a
-          id="fb-share"
-          className="icon-link social-icon-container-facebook"
-          onClick={(e) => this.onClick(e, 'facebook')}
-          title="Share via Facebook!"
-        >
-          <FontAwesomeIcon icon={['fab', 'facebook-f']} />
-        </a>
-        <a
-          id="tw-share"
-          className="icon-link social-icon-container-twitter"
-          onClick={(e) => this.onClick(e, 'twitter')}
-          title="Share via Twitter!"
-        >
-          <FontAwesomeIcon icon={['fab', 'twitter']} />
-        </a>
-        <a
-          id="rd-share"
-          className="icon-link social-icon-container-reddit-alien"
-          onClick={(e) => this.onClick(e, 'reddit')}
-          title="Share via Reddit!"
-        >
-          <FontAwesomeIcon icon={['fab', 'reddit-alien']} />
-        </a>
-        <a
-          id="email-share"
-          className="icon-link social-icon-container-email"
-          onClick={(e) => this.onClick(e, 'email')}
-          title="Share via Email!"
-        >
-          <FontAwesomeIcon icon="envelope" />
-        </a>
-      </div>
-    );
-  }
-}
+  };
+  return (
+    <div id="social-share" className="social-share">
+      <a
+        id="fb-share"
+        className="icon-link social-icon-container-facebook"
+        onClick={(e) => handleClick(e, 'facebook')}
+      >
+        <HoverTooltip
+          isMobile={isMobile}
+          labelText="Share on Facebook!"
+          placement="left-end"
+          target="fb-share"
+          fade={false}
+        />
+        <FontAwesomeIcon icon={['fab', 'facebook-f']} />
+      </a>
+      <a
+        id="tw-share"
+        className="icon-link social-icon-container-twitter"
+        onClick={(e) => handleClick(e, 'twitter')}
+      >
+        <HoverTooltip
+          isMobile={isMobile}
+          labelText="Share on Twitter!"
+          placement="left-end"
+          target="tw-share"
+          fade={false}
+        />
+        <FontAwesomeIcon icon={['fab', 'twitter']} />
+      </a>
+      <a
+        id="rd-share"
+        className="icon-link social-icon-container-reddit-alien"
+        onClick={(e) => handleClick(e, 'reddit')}
+      >
+        <HoverTooltip
+          isMobile={isMobile}
+          labelText="Share on Reddit!"
+          placement="left-end"
+          target="rd-share"
+          fade={false}
+        />
+        <FontAwesomeIcon icon={['fab', 'reddit-alien']} />
+      </a>
+      <a
+        id="email-share"
+        className="icon-link social-icon-container-email"
+        onClick={(e) => handleClick(e, 'email')}
+      >
+        <HoverTooltip
+          isMobile={isMobile}
+          labelText="Share via Email!"
+          placement="left-end"
+          target="email-share"
+          fade={false}
+        />
+        <FontAwesomeIcon icon="envelope" />
+      </a>
+    </div>
+  );
+};
 
 ShareLinks.propTypes = {
+  isMobile: PropTypes.bool,
   onClick: PropTypes.func,
 };
 

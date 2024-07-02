@@ -8,6 +8,7 @@ import {
 import { TabContent, TabPane } from 'reactstrap';
 import googleTagManager from 'googleTagManager';
 import LayersContainer from './layers-container';
+import ChartingLayerMenu from './charting';
 import Events from './events';
 import SmartHandoff from './smart-handoff';
 import CompareCase from './compare';
@@ -30,7 +31,6 @@ import {
 import { getAllActiveLayers } from '../../modules/layers/selectors';
 import { getFilteredEvents } from '../../modules/natural-events/selectors';
 import ErrorBoundary from '../error-boundary';
-import util from '../../util/util';
 import {
   changeTab as changeTabAction,
   toggleSidebarCollapse as toggleSidebarCollapseAction,
@@ -82,16 +82,6 @@ class Sidebar extends React.Component {
     if (isEmbedModeActive && activeTab === 'layers') {
       this.setState({ isEventsTabDisabledEmbed: true });
     }
-
-    // prevent browser zooming in safari
-    if (util.browser.safari) {
-      const onGestureCallback = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      };
-      this.iconElement.addEventListener('gesturestart', onGestureCallback);
-      this.sideBarCase.addEventListener('gesturestart', onGestureCallback);
-    }
   }
 
   componentDidUpdate(prevProps) {
@@ -111,19 +101,22 @@ class Sidebar extends React.Component {
 
   updateDimensions() {
     const { subComponentHeight } = this.state;
-    const { isMobile, screenHeight } = this.props;
+    const {
+      isMobile, screenHeight, isCompareMode,
+    } = this.props;
     const footerHeight = lodashGet(this, 'footerElement.clientHeight') || 20;
-    const tabHeight = 32;
+    const tabHeight = isMobile ? isCompareMode ? 80 : 40 : 32;
+    const groupCheckboxHeight = 35;
     let newHeight;
     if (!isMobile) {
       const iconHeight = 53;
       const topOffset = 10;
       const basePadding = 130;
       newHeight = screenHeight
-        - (iconHeight + topOffset + tabHeight + basePadding + footerHeight)
+        - (iconHeight + topOffset + tabHeight + groupCheckboxHeight + basePadding + footerHeight)
         - 10;
     } else {
-      newHeight = screenHeight - (tabHeight + footerHeight);
+      newHeight = screenHeight - (tabHeight + groupCheckboxHeight + footerHeight);
     }
     // Issue #1415: This was checking for subComponentHeight !== newHeight.
     // Sometimes it would get stuck in a loop in which the newHeight
@@ -153,8 +146,8 @@ class Sidebar extends React.Component {
     collapseExpandToggle();
   }
 
-  getProductsToRender(activeTab, isCompareMode) {
-    const { activeString } = this.props;
+  getProductsToRender(activeTab, isCompareMode, isChartMode) {
+    const { activeString, chartingModeAccessible } = this.props;
     const { subComponentHeight } = this.state;
     if (isCompareMode) {
       return (
@@ -163,10 +156,20 @@ class Sidebar extends React.Component {
           height={subComponentHeight}
         />
       );
-    } if (!isCompareMode) {
+    } if (isChartMode) {
+      return (
+        <ChartingLayerMenu
+          height={subComponentHeight}
+          isActive={activeTab === 'layers'}
+          compareState={activeString}
+          chartState={isChartMode}
+          chartingModeAccessible={chartingModeAccessible}
+        />
+      );
+    } if (!isCompareMode && !isChartMode) {
       return (
         <LayersContainer
-          height={subComponentHeight - 48}
+          height={subComponentHeight}
           isActive={activeTab === 'layers'}
           compareState={activeString}
         />
@@ -180,13 +183,13 @@ class Sidebar extends React.Component {
     if (window.location.search === '') return; // Nothing to reset
     let msg;
     if (isEmbedModeActive) {
-      msg = 'Do you want to open full featured Worldview in a new tab with current content loaded?';
+      msg = 'Do you want to open full featured @NAME@ in a new tab with current content loaded?';
       // eslint-disable-next-line no-alert
       if (window.confirm(msg)) {
         window.open(permalink, '_blank');
       }
     } else {
-      msg = 'Do you want to reset Worldview to its defaults? You will lose your current state.';
+      msg = 'Do you want to reset @NAME@ to its defaults? You will lose your current state.';
       // eslint-disable-next-line no-alert
       if (window.confirm(msg)) {
         googleTagManager.pushEvent({
@@ -202,24 +205,64 @@ class Sidebar extends React.Component {
       isDistractionFreeModeActive,
       isEmbedModeActive,
       selectedDate,
+      isMobile,
+      isKioskModeActive,
     } = this.props;
-    const wheelCallBack = util.browser.chrome ? util.preventPinch : null;
     const permalink = getPermalink(history.location.search, selectedDate);
     const WVLogoTitle = isEmbedModeActive
-      ? 'Click to Open This Worldview Map in a New Tab'
-      : 'Click to Reset Worldview to Defaults';
+      ? 'Click to Open This @NAME@ Map in a New Tab'
+      : 'Click to Reset @NAME@ to Defaults';
     const embedWVLogoLink = isEmbedModeActive ? permalink : '/';
+    const mobileImgURL = 'brand/images/wv-logo-mobile.svg?v=@BUILD_NONCE@';
+    const desktopImgURL = 'brand/images/wv-logo.svg?v=@BUILD_NONCE@';
+
+    const sidebarStyle = isMobile ? {
+      background: `url(${mobileImgURL}) no-repeat center rgb(40 40 40 / 85%)`,
+      display: 'block',
+      height: '42px',
+      width: '56px',
+      padding: '5px',
+      top: '10px',
+      left: '10px',
+      borderRadius: '5px',
+      border: '1px solid #333',
+      position: 'absolute',
+    }
+      : {
+        background: `url(${desktopImgURL}) no-repeat center rgb(40 40 40 / 85%)`,
+        display: 'block',
+        width: '286px',
+        height: '55px',
+        padding: '5px 0',
+        position: 'absolute',
+        top: '10px',
+        left: '10px',
+        borderRight: '1px solid #333',
+        borderLeft: '1px solid #333',
+        borderTop: '1px solid #333',
+        borderBottom: 'transparent',
+        borderTopRightRadius: '5px',
+        borderTopLeftRadius: '5px',
+        boxSizing: 'border-box',
+      };
 
     return (
-      <a
-        href={embedWVLogoLink}
-        title={WVLogoTitle}
-        id="wv-logo"
-        className={isDistractionFreeModeActive ? 'wv-logo-distraction-free-mode' : ''}
-        onClick={(e) => this.handleWorldviewLogoClick(e, permalink)}
-        ref={(iconElement) => { this.iconElement = iconElement; }}
-        onWheel={wheelCallBack}
-      />
+      isKioskModeActive ? (
+        <span
+          id="wv-logo"
+          className={isDistractionFreeModeActive ? 'wv-logo-distraction-free-mode' : ''}
+          style={sidebarStyle}
+        />
+      ) : (
+        <a
+          href={embedWVLogoLink}
+          title={WVLogoTitle}
+          id="wv-logo"
+          className={isDistractionFreeModeActive ? 'wv-logo-distraction-free-mode' : ''}
+          style={sidebarStyle}
+          onClick={(e) => this.handleWorldviewLogoClick(e, permalink)}
+        />
+      )
     );
   }
 
@@ -232,102 +275,126 @@ class Sidebar extends React.Component {
       activeTab,
       changeTab,
       config,
+      displayStaticMap,
       eventsData,
       eventsSources,
       hasEventRequestError,
       isCollapsed,
       isCompareMode,
+      isChartMode,
       isDataDisabled,
       isDistractionFreeModeActive,
       isEmbedModeActive,
       isLoadingEvents,
       isMobile,
+      isKioskModeActive,
       numberOfLayers,
       onTabClick,
       screenHeight,
       tabTypes,
+      chartingModeAccessible,
     } = this.props;
+
     if ((isMobile || isEmbedModeActive) && activeTab === 'download') changeTab('layers');
-    const wheelCallBack = util.browser.chrome ? util.preventPinch : null;
     const { naturalEvents } = config.features;
     const { smartHandoffs } = config.features;
 
     const maxHeight = isCollapsed
       ? '0'
       : isEmbedModeActive
-        ? '70vh'
+        ? '95vh'
         : `${screenHeight}px`;
+    const displayStyle = isDistractionFreeModeActive ? 'none' : 'block';
+
+    const mobileWVSidebarStyle = !isDistractionFreeModeActive && isMobile ? {
+      position: 'static',
+    } : null;
+
+    const productsHolderStyle = isDistractionFreeModeActive && !isMobile ? {
+      display: 'none',
+    } : !isDistractionFreeModeActive && isMobile && !isEmbedModeActive ? {
+      cssFloat: 'left',
+      left: '0',
+      minWidth: '238px',
+      width: '100%',
+      height: '100%',
+      position: 'absolute !important',
+      overflow: 'hidden',
+      background: 'rgb(38 43 49)',
+      top: '0',
+      zIndex: 1000,
+      maxHeight: `${maxHeight}`,
+      display: `{${displayStyle}} !important`,
+    } : {
+      maxHeight: `${maxHeight}`,
+    };
+
     return (
       <ErrorBoundary>
-        <section id="wv-sidebar">
-          {this.renderSidebarLogo()}
-          <>
-            {!isDistractionFreeModeActive && isCollapsed && (
-            <CollapsedButton
-              isMobile={isMobile}
-              onclick={this.toggleSidebar}
-              numberOfLayers={numberOfLayers}
-            />
-            )}
-            <div
-              id="productsHolder"
-              className="products-holder-case"
-              ref={(el) => {
-                this.sideBarCase = el;
-              }}
-              style={{
-                maxHeight,
-                display: isDistractionFreeModeActive ? 'none' : 'block',
-              }}
-              onWheel={wheelCallBack}
-            >
-              {!isCollapsed && (
-                <>
-                  <NavCase
-                    activeTab={activeTab}
-                    onTabClick={onTabClick}
-                    tabTypes={tabTypes}
-                    isMobile={isMobile}
-                    toggleSidebar={this.toggleSidebar}
-                    isCompareMode={isCompareMode}
-                    isDataDisabled={isDataDisabled}
-                    isEventsTabDisabledEmbed={isEventsTabDisabledEmbed}
+        <section id="wv-sidebar" style={mobileWVSidebarStyle}>
+          {!displayStaticMap && this.renderSidebarLogo()}
+          {!isDistractionFreeModeActive && isCollapsed && (
+          <CollapsedButton
+            isMobile={isMobile}
+            isEmbed={isEmbedModeActive}
+            onclick={this.toggleSidebar}
+            numberOfLayers={numberOfLayers}
+          />
+          )}
+          <div
+            id="products-holder"
+            className="products-holder-case"
+            style={productsHolderStyle}
+          >
+            {!isCollapsed && (
+            <>
+              <NavCase
+                activeTab={activeTab}
+                onTabClick={onTabClick}
+                tabTypes={tabTypes}
+                isMobile={isMobile}
+                toggleSidebar={this.toggleSidebar}
+                isCompareMode={isCompareMode}
+                isDataDisabled={isDataDisabled}
+                isEventsTabDisabledEmbed={isEventsTabDisabledEmbed}
+              />
+              <TabContent activeTab={activeTab}>
+                <TabPane tabId="layers">
+                  {this.getProductsToRender(activeTab, isCompareMode, isChartMode)}
+                </TabPane>
+                {naturalEvents && activeTab === 'events' && (
+                <TabPane tabId="events">
+                  <Events
+                    height={subComponentHeight}
+                    isLoading={isLoadingEvents}
+                    hasRequestError={hasEventRequestError}
+                    eventsData={eventsData}
+                    sources={eventsSources}
                   />
-                  <TabContent activeTab={activeTab}>
-                    <TabPane tabId="layers">
-                      {this.getProductsToRender(activeTab, isCompareMode)}
-                    </TabPane>
-                    <TabPane tabId="events">
-                      {naturalEvents && activeTab === 'events' && (
-                      <Events
-                        height={subComponentHeight}
-                        isLoading={isLoadingEvents}
-                        hasRequestError={hasEventRequestError}
-                        eventsData={eventsData}
-                        sources={eventsSources}
-                      />
-                      )}
-                    </TabPane>
-                    <TabPane tabId="download">
-                      {smartHandoffs && (
-                      <SmartHandoff
-                        isActive={activeTab === 'download'}
-                        tabTypes={tabTypes}
-                      />
-                      )}
-                    </TabPane>
-
+                </TabPane>
+                )}
+                {smartHandoffs && activeTab === 'download' && (
+                <TabPane tabId="download">
+                  <SmartHandoff
+                    isActive={activeTab === 'download'}
+                    tabTypes={tabTypes}
+                  />
+                </TabPane>
+                )}
+                {
+                  !isKioskModeActive && (
                     <FooterContent
                       ref={(el) => { this.footerElement = el; }}
                       tabTypes={tabTypes}
                       activeTab={activeTab}
+                      chartingModeAccessible={chartingModeAccessible}
                     />
-
-                  </TabContent>
-                </>
-              )}
-            </div>
-          </>
+                  )
+                }
+              </TabContent>
+            </>
+            )}
+          </div>
         </section>
       </ErrorBoundary>
     );
@@ -337,20 +404,23 @@ class Sidebar extends React.Component {
 const mapStateToProps = (state) => {
   const {
     animation,
-    browser,
     compare,
+    charting,
     config,
     embed,
     events,
+    layers,
     measure,
     modal,
     map,
     requestedEvents,
     requestedEventSources,
+    screenSize,
     sidebar,
     ui,
   } = state;
 
+  const chartingModeAccessible = layers.active.layers.filter((layer) => Object.prototype.hasOwnProperty.call(layer, 'palette')).length > 0;
   const isLoadingEvents = requestedEvents.isLoading
     || requestedEventSources.isLoading;
   const hasEventRequestError = !!(requestedEvents.error
@@ -358,8 +428,8 @@ const mapStateToProps = (state) => {
 
   const eventsData = getFilteredEvents(state);
   const eventsSources = lodashGet(requestedEventSources, 'response');
-  const { screenHeight } = browser;
-  const { isDistractionFreeModeActive } = ui;
+  const { screenHeight } = screenSize;
+  const { isDistractionFreeModeActive, isKioskModeActive, displayStaticMap } = ui;
   const { isEmbedModeActive } = embed;
   const { activeTab, isCollapsed, mobileCollapsed } = sidebar;
   const { activeString } = compare;
@@ -370,7 +440,7 @@ const mapStateToProps = (state) => {
   }
   const tabTypes = getActiveTabs(config);
   const snapshotModalOpen = modal.isOpen && modal.id === 'TOOLBAR_SNAPSHOT';
-  const isMobile = browser.lessThan.medium;
+  const isMobile = screenSize.isMobileDevice;
   // Collapse when Image download / GIF /  is open or measure tool active
   const shouldBeCollapsed = snapshotModalOpen || measure.isActive || animation.gifActive;
   const selectedMap = map && map.ui && map.ui.selected;
@@ -378,16 +448,20 @@ const mapStateToProps = (state) => {
   return {
     activeTab,
     activeString,
+    chartingModeAccessible,
     config,
+    displayStaticMap,
     eventsData,
     eventsSources,
     numberOfLayers,
     hasEventRequestError,
     isCollapsed: isMobile ? mobileCollapsed : isCollapsed || shouldBeCollapsed,
     isCompareMode: compare.active,
+    isChartMode: charting.active,
     isDataDisabled: events.isAnimatingToEvent,
     isDistractionFreeModeActive,
     isEmbedModeActive,
+    isKioskModeActive,
     isLoadingEvents,
     isMobile,
     selectedMap,
@@ -436,6 +510,7 @@ Sidebar.propTypes = {
   activeString: PropTypes.string,
   activeTab: PropTypes.string,
   changeTab: PropTypes.func,
+  chartingModeAccessible: PropTypes.bool,
   collapseExpandToggle: PropTypes.func,
   config: PropTypes.object,
   eventsData: PropTypes.array,
@@ -443,6 +518,7 @@ Sidebar.propTypes = {
   hasEventRequestError: PropTypes.bool,
   isCollapsed: PropTypes.bool,
   isCompareMode: PropTypes.bool,
+  isChartMode: PropTypes.bool,
   isDataDisabled: PropTypes.bool,
   isDistractionFreeModeActive: PropTypes.bool,
   isEmbedModeActive: PropTypes.bool,

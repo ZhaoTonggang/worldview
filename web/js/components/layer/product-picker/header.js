@@ -20,6 +20,7 @@ import {
 } from '../../../modules/product-picker/actions';
 import { getLayersForProjection } from '../../../modules/product-picker/selectors';
 import util from '../../../util/util';
+import { JOYRIDE_INCREMENT } from '../../../util/constants';
 
 const { events } = util;
 
@@ -74,7 +75,7 @@ class ProductPickerHeader extends React.Component {
     if (showMobileFacets) {
       toggleMobileFacets();
     }
-  }
+  };
 
   renderBreadCrumb() {
     const { category } = this.props;
@@ -108,7 +109,7 @@ class ProductPickerHeader extends React.Component {
     const { mode, toggleSearchMode } = this.props;
     if (mode !== 'search') {
       setTimeout(() => {
-        events.trigger('joyride:increment');
+        events.trigger(JOYRIDE_INCREMENT);
       }, 4000);
       toggleSearchMode();
     }
@@ -133,11 +134,14 @@ class ProductPickerHeader extends React.Component {
     } = this.props;
     const searchMode = mode === 'search';
     const categoryId = category && category.id;
+    const recentLayersMode = categoryType === 'recent';
+    const featuredLayersMode = categoryType === 'featured';
     const showBackButton = searchMode
       || (categoryId !== 'featured-all'
       && selectedProjection === 'geographic'
-      && mode !== 'category');
-    const recentLayersMode = categoryType === 'recent';
+      && mode !== 'category'
+      && !featuredLayersMode
+      && !recentLayersMode);
     const isBreadCrumb = showBackButton && !searchMode && width > 650;
     const showReset = !!(filters.length || searchTerm.length) && mode === 'search';
     const showFilterBtnMobile = recentLayersMode
@@ -160,6 +164,7 @@ class ProductPickerHeader extends React.Component {
                 onClick={this.revertToInitialScreen}
               >
                 <UncontrolledTooltip
+                  id="center-align-tooltip"
                   placement="right"
                   target="layer-back-button"
                 >
@@ -188,6 +193,7 @@ class ProductPickerHeader extends React.Component {
               aria-label="Filtered layer search"
             >
               <UncontrolledTooltip
+                id="center-align-tooltip"
                 placement="right"
                 target="layer-filter-button"
               >
@@ -265,7 +271,7 @@ const mapDispatchToProps = (dispatch) => ({
 });
 
 const mapStateToProps = (state) => {
-  const { productPicker, browser, proj } = state;
+  const { productPicker, screenSize, proj } = state;
   const {
     mode,
     category,
@@ -274,7 +280,7 @@ const mapStateToProps = (state) => {
     selectedLayer,
     searchConfig,
   } = productPicker;
-  const isMobile = browser.lessThan.medium;
+  const isMobile = screenSize.isMobileDevice;
   const layers = getLayersForProjection(state);
 
   return {

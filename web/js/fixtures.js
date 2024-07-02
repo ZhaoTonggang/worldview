@@ -1,11 +1,19 @@
 import proj4 from 'proj4';
 import { register } from 'ol/proj/proj4';
+import Cache from 'cachai';
+
 import { initialState as initialLayerState } from './modules/layers/reducers';
 import { initialCompareState } from './modules/compare/reducers';
+import { initialChartingState } from './modules/charting/reducers';
 import { getInitialState as getInitialDateState } from './modules/date/reducers';
 import { defaultState as initialAnimationState } from './modules/animation/reducers';
 import { defaultAlertState } from './modules/alerts/reducer';
 import { getInitialEventsState } from './modules/natural-events/reducers';
+import { sidebarState as initialSidebarState } from './modules/sidebar/reducers';
+import { uiState as initialUiState } from './modules/ui/reducers';
+import util from './util/util';
+
+const mockBaseCmrApi = 'mock.cmr.api/';
 
 const fixtures = {
   red: 'ff0000ff',
@@ -17,9 +25,11 @@ const fixtures = {
   light_blue: 'f0f0ffff',
   dark_blue: '000040',
 };
+
 fixtures.getState = function() {
   return {
     compare: initialCompareState,
+    charting: initialChartingState,
     config: fixtures.config(),
     layers: initialLayerState,
     alerts: defaultAlertState,
@@ -27,10 +37,13 @@ fixtures.getState = function() {
     events: getInitialEventsState(fixtures.config()),
     map: fixtures.map(),
     animation: initialAnimationState,
+    sidebar: initialSidebarState,
+    ui: initialUiState,
     proj: {
       selected: {
         id: 'geographic',
         crs: 'EPSG:4326',
+        maxExtent: [-180, -90, 180, 90],
       },
     },
     palettes: {
@@ -209,10 +222,11 @@ fixtures.map = () => ({
 });
 
 fixtures.config = function() {
+  const now = util.now();
   return {
-    pageLoadTime: new Date(),
-    initialDate: new Date(),
-    now: new Date(),
+    pageLoadTime: now,
+    initialDate: now,
+    now,
     defaults: {
       projection: 'geographic',
       startingLayers: [
@@ -237,6 +251,70 @@ fixtures.config = function() {
         id: 'antarctic',
         epsg: 3031,
         crs: 'EPSG:3031',
+      },
+    },
+    sources: {
+      'GIBS:geographic:nrt': {
+        matrixSets: {
+          '250m': {
+            id: '250m',
+            maxResolution: 0.5625,
+            resolutions: [
+              0.5625,
+              0.28125,
+              0.140625,
+              0.0703125,
+              0.03515625,
+              0.017578125,
+              0.0087890625,
+              0.00439453125,
+              0.002197265625,
+            ],
+            tileSize: [
+              512,
+              512,
+            ],
+            tileMatrices: [
+              {
+                matrixWidth: 2,
+                matrixHeight: 1,
+              },
+              {
+                matrixWidth: 3,
+                matrixHeight: 2,
+              },
+              {
+                matrixWidth: 5,
+                matrixHeight: 3,
+              },
+              {
+                matrixWidth: 10,
+                matrixHeight: 5,
+              },
+              {
+                matrixWidth: 20,
+                matrixHeight: 10,
+              },
+              {
+                matrixWidth: 40,
+                matrixHeight: 20,
+              },
+              {
+                matrixWidth: 80,
+                matrixHeight: 40,
+              },
+              {
+                matrixWidth: 160,
+                matrixHeight: 80,
+              },
+              {
+                matrixWidth: 320,
+                matrixHeight: 160,
+              },
+            ],
+          },
+        },
+        url: 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/nrt/wmts.cgi',
       },
     },
     layers: {
@@ -278,6 +356,156 @@ fixtures.config = function() {
           antarctic: {},
         },
       },
+      'granule-cr': {
+        id: 'granule-cr',
+        group: 'overlays',
+        startDate: '2019-09-23T00:12:00Z',
+        endDate: '2019-09-24T23:54:00Z',
+        source: 'GIBS:geographic:nrt',
+        matrixSet: '250m',
+        conceptIds: [
+          {
+            shortName: 'VJ102IMG_NRT',
+            title: 'VIIRS/JPSS1 Imagery Resolution 6 Min L1B Swath 375m NRT',
+            type: 'NRT',
+            value: 'C2208779826-LANCEMODIS',
+            version: '2.1',
+          },
+          {
+            shortName: 'VJ103IMG_NRT',
+            title: 'VIIRS/JPSS1 Imagery Resolution Terrain Corrected Geolocation 6 Min L1 Swath 375m NRT',
+            type: 'NRT',
+            value: 'C2208793489-LANCEMODIS',
+            version: '2.1',
+          },
+          {
+            shortName: 'VJ102MOD_NRT',
+            title: 'VIIRS/JPSS1 Moderate Resolution 6 Min L1B Swath 750m NRT',
+            type: 'NRT',
+            value: 'C2208778455-LANCEMODIS',
+            version: '2.1',
+          },
+          {
+            shortName: 'VJ102MOD_NRT',
+            title: 'VIIRS/JPSS1 Moderate Resolution 6-Min L1B Swath 750m NRT',
+            type: 'NRT',
+            value: 'C1604614285-LANCEMODIS',
+            version: '2',
+          },
+        ],
+        dateRanges: [
+          {
+            startDate: '2019-09-23T00:12:00Z',
+            endDate: '2019-09-23T00:24:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T02:06:00Z',
+            endDate: '2019-09-23T02:06:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T02:18:00Z',
+            endDate: '2019-09-23T02:18:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T03:42:00Z',
+            endDate: '2019-09-23T04:00:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T05:18:00Z',
+            endDate: '2019-09-23T05:42:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T07:00:00Z',
+            endDate: '2019-09-23T07:24:00Z',
+            dateInterval: '6',
+          },
+          {
+            startDate: '2019-09-23T08:42:00Z',
+            endDate: '2019-09-23T09:06:00Z',
+            dateInterval: '6',
+          },
+        ],
+        projections: {
+          geographic: {
+            startDate: '2019-09-23T00:12:00Z',
+            endDate: '2019-09-24T23:54:00Z',
+            dateRanges: [
+              {
+                startDate: '2019-09-23T00:12:00Z',
+                endDate: '2019-09-23T00:24:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T02:06:00Z',
+                endDate: '2019-09-23T02:06:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T02:18:00Z',
+                endDate: '2019-09-23T02:18:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T03:42:00Z',
+                endDate: '2019-09-23T04:00:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T05:18:00Z',
+                endDate: '2019-09-23T05:42:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T07:00:00Z',
+                endDate: '2019-09-23T07:24:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-09-23T08:42:00Z',
+                endDate: '2019-09-23T09:06:00Z',
+                dateInterval: '6',
+              },
+            ],
+          },
+          arctic: {
+            startDate: '2019-07-21T00:36:00Z',
+            endDate: '2019-09-24T22:30:00Z',
+            dateRanges: [
+              {
+                startDate: '2019-07-21T00:36:00Z',
+                endDate: '2019-07-21T00:54:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-07-21T02:18:00Z',
+                endDate: '2019-07-21T02:36:00Z',
+                dateInterval: '6',
+              },
+            ],
+          },
+          antarctic: {
+            startDate: '2019-07-12T01:18:00Z',
+            endDate: '2019-09-24T23:36:00Z',
+            dateRanges: [
+              {
+                startDate: '2019-07-12T01:18:00Z',
+                endDate: '2019-07-12T01:24:00Z',
+                dateInterval: '6',
+              },
+              {
+                startDate: '2019-07-12T03:00:00Z',
+                endDate: '2019-07-12T03:06:00Z',
+                dateInterval: '6',
+              },
+            ],
+          },
+        },
+      },
       AMSRE_Brightness_Temp_89H_Night: {
         id: 'AMSRE_Brightness_Temp_89H_Night',
         title: 'Brightness Temperature (89H GHz B Scan, Night)',
@@ -291,7 +519,7 @@ fixtures.config = function() {
           arctic: {},
           antarctic: {},
         },
-        inactive: true,
+        ongoing: false,
       },
       MODIS_Combined_L4_LAI_4Day: {
         id: 'MODIS_Combined_L4_LAI_4Day',
@@ -301,6 +529,7 @@ fixtures.config = function() {
         group: 'overlays',
         product: 'MCD15A3H',
         layergroup: 'Leaf Area Index',
+        ongoing: true,
         dateRanges: [
           {
             startDate: '2018-01-01T00:00:00Z',
@@ -367,7 +596,7 @@ fixtures.config = function() {
         tags: 'vector vectors',
         group: 'overlays',
         layergroup: 'Orbital Track',
-        inactive: true,
+        ongoing: false,
         vectorStyle: {
           id: 'OrbitTracks_Aqua_Ascending',
         },
@@ -380,25 +609,28 @@ fixtures.config = function() {
           id: 'dustHaze',
           title: 'Dust and Haze',
           description: 'Related to dust storms, air pollution and other non-volcanic aerosols. Volcano-related plumes shall be included with the originating eruption event.',
-          layers: 'https://eonet.sci.gsfc.nasa.gov/api/v3/layers/dustHaze',
+          layers: 'https://eonet.gsfc.nasa.gov/api/v3/layers/dustHaze',
         },
         {
           id: 'manmade',
           title: 'Manmade',
           description: 'Events that have been human-induced and are extreme in their extent.',
-          layers: 'https://eonet.sci.gsfc.nasa.gov/api/v3/layers/manmade',
+          layers: 'https://eonet.gsfc.nasa.gov/api/v3/layers/manmade',
         },
         {
           id: 'seaLakeIce',
           title: 'Sea and Lake Ice',
           description: 'Related to all ice that resides on oceans and lakes, including sea and lake ice (permanent and seasonal) and icebergs.',
-          layers: 'https://eonet.sci.gsfc.nasa.gov/api/v3/layers/seaLakeIce',
+          layers: 'https://eonet.gsfc.nasa.gov/api/v3/layers/seaLakeIce',
         }],
     },
     features: {
       compare: true,
       naturalEvents: {
         host: 'fake.eonet.url/api',
+      },
+      cmr: {
+        url: mockBaseCmrApi,
       },
     },
     palettes: {
@@ -665,6 +897,8 @@ fixtures.config = function() {
     },
   };
 };
+
+fixtures.cache = new Cache(400);
 
 export function registerProjections() {
   proj4.defs(

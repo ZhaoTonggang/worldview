@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { UncontrolledTooltip } from 'reactstrap';
 import util from '../../util/util';
 
 // previous : next
@@ -44,15 +43,12 @@ export default class Coordinates extends React.Component {
         className="wv-coords-map wv-coords-map-btn"
         onClick={this.changeFormat}
       >
-        <UncontrolledTooltip placement="bottom" target="coords-panel">
-          Change coordinates format
-        </UncontrolledTooltip>
         <span className="map-coord">
-          {`${coords}`}
+          {coords}
         </span>
         <div className="map-coord-format">
           <span className="map-coord">
-            {`${crs}`}
+            {crs}
           </span>
           <div aria-label="Change coordinates format" className="coord-btn">
             <i className="coord-switch" />
@@ -70,3 +66,7 @@ Coordinates.propTypes = {
   latitude: PropTypes.number,
   longitude: PropTypes.number,
 };
+
+
+
+

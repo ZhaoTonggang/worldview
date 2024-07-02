@@ -18,8 +18,11 @@
                     "Forests, Mangrove",
 					"Soil Moisture",
                     "Snow Cover",
+                    "Snow Indices",
                     "Snow Water Equivalent",
-                    "Water Bodies"
+                    "Surface Water Extent",
+                    "Water Bodies",
+                    "Water Indices"
                 ]
             }
         }

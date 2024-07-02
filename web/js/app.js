@@ -3,11 +3,10 @@ import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 // eslint-disable-next-line no-unused-vars
 import whatInput from 'what-input';
-import googleTagManager from 'googleTagManager';
 
 // Utils
-import { calculateResponsiveState } from 'redux-responsive';
 import util from './util/util';
+import { STARTUP } from './util/constants';
 // eslint-disable-next-line import/no-named-as-default
 import MapInteractions from './containers/map-interactions/map-interactions';
 // Toolbar
@@ -15,6 +14,7 @@ import Toolbar from './containers/toolbar';
 import Sidebar from './containers/sidebar/sidebar';
 // Modal
 import Modal from './containers/modal';
+import { openCustomContent } from './modules/modal/actions';
 // Location Search
 import LocationSearch from './components/location-search/location-search';
 
@@ -22,71 +22,30 @@ import LocationSearch from './components/location-search/location-search';
 import Brand from './brand';
 import Embed from './containers/embed';
 import MeasureButton from './components/measure-tool/measure-button';
-import FeatureAlert from './components/feature-alert/alert';
-import Alerts from './containers/alerts';
+import AlertDropdown from './containers/alertDropdown';
+import LoadingSpinner from './components/map/loading-spinner';
 import './font-awesome-library';
+import Tour from './containers/tour';
 
 // actions
-import Tour from './containers/tour';
 import Timeline from './containers/timeline/timeline';
-import AnimationWidget from './containers/animation-widget';
+import AnimationWidget from './containers/animation-widget/animation-widget';
 import ErrorBoundary from './containers/error-boundary';
 import Debug from './components/util/debug';
 import keyPress from './modules/key-press/actions';
-
+import setScreenInfo from './modules/screen-size/actions';
+// Notifications
+import { addToLocalStorage } from './modules/notifications/util';
+import Notifications from './containers/notifications';
+import { outageNotificationsSeenAction } from './modules/notifications/actions';
 // Dependency CSS
-import '../../node_modules/bootstrap/dist/css/bootstrap.min.css';
-import '../../node_modules/ol/ol.css';
-import '../../node_modules/rc-slider/dist/rc-slider.min.css';
-import '../../node_modules/simplebar/dist/simplebar.min.css';
-import '../../node_modules/react-swipe-to-delete-component/dist/swipe-to-delete.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'ol/ol.css';
+import 'simplebar/dist/simplebar.min.css';
 import 'react-image-crop/dist/ReactCrop.css';
 import 'react-resizable/css/styles.css';
 // App CSS
-import '../css/fonts.css';
-import '../css/alert.css';
-import '../css/reset.css';
-import '../css/compare.css';
-import '../css/search-ui-override.css';
-import '../css/rc-slider-overrides.css';
-import '../css/react-joyride-override.css';
-import '../css/util.css';
-import '../css/toolbar.css';
-import '../css/notifications.css';
-import '../css/sidebar-panel.css';
-import '../css/button.css';
-import '../css/modal.css';
-import '../css/checkbox.css';
-import '../css/map.css';
-import '../css/link.css';
-import '../css/palettes.css';
-import '../css/image.css';
-import '../css/projection.css';
-import '../css/tour.css';
-import '../css/products.css';
-import '../css/events.css';
-import '../css/event-filter.css';
-import '../css/smart-handoff.css';
-import '../css/sidebar.css';
-import '../css/layer-categories.css';
-import '../css/layers.css';
-import '../css/scrollbar.css';
-import '../css/switch.css';
-import '../css/timeline.css';
-import '../css/layer-coverage-panel.css';
-import '../css/anim.widget.css';
-import '../css/dateselector.css';
-import '../css/tooltip.css';
-import '../css/about.css';
-import '../css/mobile.css';
-import '../css/measure.css';
-import '../css/list.css';
-import '../css/vectorMeta.css';
-import '../css/orbitTracks.css';
-import '../css/facets.css';
-import '../css/recent-layers.css';
-import '../css/location-search.css';
-import '../css/embed.css';
+import '../scss/index.scss';
 
 require('@elastic/react-search-ui-views/lib/styles/styles.css');
 
@@ -102,20 +61,34 @@ class App extends React.Component {
 
   componentDidMount() {
     document.addEventListener('keydown', this.handleKeyPress);
-    // We listen to the resize event
     window.addEventListener('resize', this.setVhCSSProperty);
+    window.addEventListener('orientationchange', this.setVhCSSProperty);
+  }
+
+  componentDidUpdate(prevProps) {
+    // Check if the numberUnseen prop has changed
+    const {
+      kioskModeEnabled, notifications, numberOutagesUnseen, e2eModeEnabled,
+    } = this.props;
+    if (numberOutagesUnseen !== prevProps.numberOutagesUnseen) {
+      if (numberOutagesUnseen > 0 && !kioskModeEnabled && !e2eModeEnabled) {
+        this.openNotification(notifications, numberOutagesUnseen);
+      }
+    }
   }
 
   componentWillUnmount() {
     document.removeEventListener('keydown', this.handleKeyPress);
+    window.removeEventListener('resize', this.setVhCSSProperty);
+    window.removeEventListener('orientationchange', this.setVhCSSProperty);
   }
+
 
   // https://css-tricks.com/the-trick-to-viewport-units-on-mobile/
   setVhCSSProperty = () => {
-    // We execute the same script as before
     const vh = window.innerHeight * 0.01;
     document.documentElement.style.setProperty('--vh', `${vh}px`);
-  }
+  };
 
   handleKeyPress(event) {
     const { keyPressAction } = this.props;
@@ -123,6 +96,16 @@ class App extends React.Component {
     const isInput = event.srcElement.nodeName === 'INPUT';
     keyPressAction(event.keyCode, event.shiftKey, ctrlOrCmdKey, isInput);
   }
+
+  getScreenInfo = () => {
+    const { setScreenInfoAction } = this.props;
+    setScreenInfoAction();
+  };
+
+  openNotification = (obj, numberOutagesUnseen) => {
+    const { notificationClick } = this.props;
+    notificationClick(obj, numberOutagesUnseen);
+  };
 
   onload() {
     const self = this;
@@ -137,11 +120,6 @@ class App extends React.Component {
       }
 
       if (Brand.release()) {
-        if (config.features.googleTagManager) {
-          if (window.location.href.includes(Brand.BRAND_URL)) {
-            googleTagManager.getIpAddress();
-          }
-        }
         // Console build version notifications
         console.info(
           `${Brand.NAME
@@ -154,10 +132,13 @@ class App extends React.Component {
         console.warn('Development version');
       }
       window.addEventListener('resize', () => {
-        self.props.screenResize(window);
+        self.getScreenInfo();
       });
-      self.props.screenResize(window);
-      events.trigger('startup');
+      window.addEventListener('orientationchange', () => {
+        self.getScreenInfo();
+      });
+      self.getScreenInfo();
+      events.trigger(STARTUP);
       self.setVhCSSProperty();
     };
     util.wrap(main)();
@@ -169,6 +150,7 @@ class App extends React.Component {
       isEmbedModeActive,
       isMobile,
       isTourActive,
+      numberOutagesUnseen,
       locationKey,
       modalId,
       parameters,
@@ -177,20 +159,20 @@ class App extends React.Component {
     return (
       <div className={appClass} id="wv-content" data-role="content">
         {!isMobile && !isEmbedModeActive && <LocationSearch />}
+        <LoadingSpinner />
         <Toolbar />
         <MapInteractions />
-        <div id="wv-alert-container" className="wv-alert-container">
-          <FeatureAlert />
-          <Alerts />
+        <AlertDropdown isTourActive={isTourActive} />
+        <div>
+          {isTourActive && numberOutagesUnseen === 0 && (!isMobile || isEmbedModeActive) ? <Tour /> : null}
         </div>
         <Sidebar />
-        {isTourActive ? <Tour /> : null}
         <div id="layer-modal" className="layer-modal" />
         <div id="layer-settings-modal" />
         <div id="eventsHolder" />
         <div id="imagedownload" />
         <Timeline />
-        <div id="wv-animation-widget-case">
+        <div>
           {isAnimationWidgetActive ? <AnimationWidget key={locationKey || '2'} /> : null}
         </div>
         <MeasureButton />
@@ -205,13 +187,26 @@ class App extends React.Component {
 }
 
 function mapStateToProps(state) {
+  const { notifications } = state;
+  const {
+    numberOutagesUnseen, numberUnseen, type, object,
+  } = notifications;
+  const kioskModeEnabled = (state.ui.eic !== null && state.ui.eic !== '') || state.ui.isKioskModeActive;
+  const e2eModeEnabled = state.ui.isE2eModeActive;
   return {
     state,
+    kioskModeEnabled,
+    e2eModeEnabled,
     isAnimationWidgetActive: state.animation.isActive,
     isEmbedModeActive: state.embed.isEmbedModeActive,
-    isMobile: state.browser.lessThan.medium,
+    isMobile: state.screenSize.isMobileDevice,
     isTourActive: state.tour.active,
+    notifications,
+    numberOutagesUnseen,
+    numberUnseen,
+    object,
     tour: state.tour,
+    type,
     config: state.config,
     parameters: state.parameters,
     locationKey: state.location.key,
@@ -222,8 +217,31 @@ const mapDispatchToProps = (dispatch) => ({
   keyPressAction: (keyCode, shiftKey, ctrlOrCmdKey, isInput) => {
     dispatch(keyPress(keyCode, shiftKey, ctrlOrCmdKey, isInput));
   },
-  screenResize: (width, height) => {
-    dispatch(calculateResponsiveState(window));
+  setScreenInfoAction: () => {
+    dispatch(setScreenInfo());
+  },
+  notificationClick: (obj, numberOutagesUnseen) => {
+    // Used to update local storage to reflect OUTAGES have been seen
+    const notificationsSeenObj = {
+      alerts: [],
+      layerNotices: [],
+      messages: [],
+      outages: obj.object.outages,
+    };
+
+    dispatch(
+      openCustomContent('NOTIFICATION_LIST_MODAL', {
+        headerText: 'Notifications',
+        bodyComponent: Notifications,
+        source: 'outage-alert',
+        onClose: () => {
+          if (numberOutagesUnseen > 0) {
+            dispatch(outageNotificationsSeenAction());
+            addToLocalStorage(notificationsSeenObj);
+          }
+        },
+      }),
+    );
   },
 });
 
@@ -234,11 +252,21 @@ export default connect(
 
 App.propTypes = {
   isAnimationWidgetActive: PropTypes.bool,
+  kioskModeEnabled: PropTypes.bool,
+  e2eModeEnabled: PropTypes.bool,
   isEmbedModeActive: PropTypes.bool,
   isMobile: PropTypes.bool,
   isTourActive: PropTypes.bool,
   keyPressAction: PropTypes.func,
   locationKey: PropTypes.string,
   modalId: PropTypes.string,
+  notificationClick: PropTypes.func,
+  notifications: PropTypes.object,
+  numberOutagesUnseen: PropTypes.number,
   parameters: PropTypes.object,
+  setScreenInfoAction: PropTypes.func,
+};
+
+App.defaultProps = {
+  numberOutagesUnseen: 0,
 };

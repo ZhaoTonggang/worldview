@@ -1,16 +1,12 @@
 import {
   forEach as lodashForEach,
   map as lodashMap,
+  get as lodashGet,
+  cloneDeep as lodashCloneDeep,
 } from 'lodash';
-import moment from 'moment';
 import { available } from '../layers/selectors';
 import util from '../../util/util';
-
-const periodIntervalMap = {
-  daily: 'Day',
-  monthly: 'Month',
-  yearly: 'Year',
-};
+import { formatDisplayDate } from '../date/util';
 
 // WARNING: capitalizing certain props could break other parts of WV
 // that read these props, need to watch for that when integrating this code
@@ -51,7 +47,10 @@ function setCategoryFacetProps (layers, measurements, categories) {
         return;
       }
       (subCategoryObj.measurements || []).forEach((measureKey) => {
-        const { sources } = measurements[measureKey];
+        const sources = lodashGet(measurements, `[${measureKey}].sources`);
+        if (!sources) {
+          throw new Error(`No measurement config entry for "${measureKey}".`);
+        }
         lodashForEach(sources, ({ settings = [] }) => {
           settings.forEach((id) => {
             setLayerProp(layers[id], 'categories', subCategoryKey);
@@ -62,44 +61,10 @@ function setCategoryFacetProps (layers, measurements, categories) {
   });
 }
 
-function formatFacetProps({ layers, measurements, categories }) {
+function setMeasurementCategoryProps(layers, { measurements, categories }) {
   setMeasurementSourceFacetProps(layers, measurements);
   setCategoryFacetProps(layers, measurements, categories);
   return layers;
-}
-
-function setLayerPeriodFacetProps(layer) {
-  const { period, dateRanges } = layer;
-  if (!dateRanges) {
-    layer.facetPeriod = capitalizeFirstLetter(period);
-    return;
-  }
-  const dateIntervals = (dateRanges || []).map(({ dateInterval }) => dateInterval);
-  const firstInterval = Number.parseInt(dateIntervals[0], 10);
-  const consistentIntervals = dateIntervals.every((interval) => {
-    const parsedInterval = Number.parseInt(interval, 10);
-    return parsedInterval === firstInterval;
-  });
-
-  layer.facetPeriod = capitalizeFirstLetter(period);
-
-  if (period === 'subdaily' || firstInterval === 1) {
-    return;
-  }
-
-  if (consistentIntervals && firstInterval <= 16) {
-    layer.facetPeriod = `${firstInterval}-${periodIntervalMap[period]}`;
-  } else if (layer.id.includes('7Day')) {
-    layer.facetPeriod = '7-Day';
-  } else if (layer.id.includes('5Day')) {
-    layer.facetPeriod = '5-Day';
-  } else if (layer.id.includes('Monthly')) {
-    layer.facetPeriod = 'Monthly';
-  } else if (layer.id.includes('Weekly')) {
-    layer.facetPeriod = '7-Day';
-  } else {
-    layer.facetPeriod = `Multi-${periodIntervalMap[period]}`;
-  }
 }
 
 function setCoverageFacetProp(layer, selectedDate) {
@@ -110,8 +75,24 @@ function setCoverageFacetProp(layer, selectedDate) {
   if (!startDate && !endDate && !dateRanges) {
     layer.coverage = ['Always Available'];
   } else if (available(id, selectedDate, [layer], {})) {
-    layer.coverage = [`Available ${moment.utc(selectedDate).format('YYYY MMM DD')}`];
+    layer.coverage = [`Available ${formatDisplayDate(selectedDate)}`];
   }
+}
+
+function setTypeProp(layer) {
+  const { type } = layer;
+  const rasterTypes = ['wms', 'wmts', 'xyz'];
+  if (rasterTypes.includes(type)) {
+    layer.type = 'Raster (Mosaicked)';
+  }
+  if (layer.type === 'granule') {
+    layer.type = 'Raster (Granule)';
+  }
+  if (layer.type === 'titiler') {
+    layer.type = 'Dynamically-rendered';
+  }
+  layer.type = capitalizeFirstLetter(layer.type);
+  return layer;
 }
 
 /**
@@ -119,12 +100,13 @@ function setCoverageFacetProp(layer, selectedDate) {
  * @param {*} config
  */
 export default function buildLayerFacetProps(config, selectedDate) {
-  const layers = formatFacetProps(config);
+  let layers = lodashCloneDeep(config.layers);
+  layers = setMeasurementCategoryProps(layers, config);
 
   return lodashMap(layers, (layer) => {
     setCoverageFacetProp(layer, selectedDate);
-    setLayerPeriodFacetProps(layer);
     setLayerProp(layer, 'sources', layer.subtitle);
+    setTypeProp(layer);
     if (layer.daynight && layer.daynight.length) {
       if (typeof layer.daynight === 'string') {
         layer.daynight = [layer.daynight];

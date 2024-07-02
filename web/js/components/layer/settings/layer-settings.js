@@ -1,15 +1,22 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { each as lodashEach } from 'lodash';
+import { each as lodashEach, get as lodashGet } from 'lodash';
 import {
   TabContent, TabPane, Nav, NavItem, NavLink,
 } from 'reactstrap';
 import { connect } from 'react-redux';
+
 import Opacity from './opacity';
 import Palette from './palette';
-import OrbitTracks from './orbit-tracks-toggle';
+import BandSelection from './band-selection/band-selection-parent-info-menu';
+import AssociatedLayers from './associated-layers-toggle';
 import VectorStyle from './vector-style';
 import PaletteThreshold from './palette-threshold';
+import GranuleLayerDateList from './granule-date-list';
+import GranuleCountSlider from './granule-count-slider';
+import safeLocalStorage from '../../../util/local-storage';
+import ImagerySearch from './imagery-search';
+
 
 import {
   palettesTranslate,
@@ -22,6 +29,10 @@ import {
   getPaletteLegend,
   isPaletteAllowed,
 } from '../../../modules/palettes/selectors';
+import {
+  getGranuleLayer,
+  getGranulePlatform,
+} from '../../../modules/layers/selectors';
 import {
   setThresholdRangeAndSquash,
   setCustomPalette,
@@ -38,7 +49,11 @@ import {
 import {
   getVectorStyle,
 } from '../../../modules/vector-styles/selectors';
-import { setOpacity } from '../../../modules/layers/actions';
+import {
+  updateGranuleLayerOptions,
+  resetGranuleLayerDates,
+  setOpacity,
+} from '../../../modules/layers/actions';
 import ClassificationToggle from './classification-toggle';
 
 class LayerSettings extends React.Component {
@@ -46,10 +61,17 @@ class LayerSettings extends React.Component {
     super(props);
     this.state = {
       activeIndex: 0,
+      allowGranuleReorder: false,
     };
     this.canvas = document.createElement('canvas');
     this.canvas.width = 120;
     this.canvas.height = 10;
+  }
+
+  componentDidMount() {
+    const { ALLOW_GRANULE_REORDER } = safeLocalStorage.keys;
+    const allowGranuleReorder = safeLocalStorage.getItem(ALLOW_GRANULE_REORDER);
+    this.setState({ allowGranuleReorder });
   }
 
   /**
@@ -63,6 +85,7 @@ class LayerSettings extends React.Component {
       paletteOrder,
       getDefaultLegend,
       getCustomPalette,
+      globalTemperatureUnit,
       setCustomPalette,
       palettesTranslate,
       groupName,
@@ -93,7 +116,8 @@ class LayerSettings extends React.Component {
       const start = palette.min ? legend.refs.indexOf(palette.entries.refs[palette.min]) : 0;
       const end = palette.max ? legend.refs.indexOf(palette.entries.refs[palette.max]) : max;
       let paneItemEl;
-      if (legend.type === 'classification' && legend.colors.length > 1) {
+
+      if (legend.type === 'classification' && (legend.colors.length > 1 || layer.id.includes('AERONET'))) {
         paneItemEl = (
           <TabPane key={`${legend.id}pane`} tabId={i}>
             <ClassificationToggle
@@ -123,6 +147,7 @@ class LayerSettings extends React.Component {
                 key={`${layer.id + i}_threshold`}
                 legend={legend}
                 setRange={setThresholdRange}
+                globalTemperatureUnit={globalTemperatureUnit}
                 min={0}
                 max={max}
                 start={start}
@@ -156,10 +181,10 @@ class LayerSettings extends React.Component {
       navElements.push(navItemEl);
     });
     return (
-      <>
+      <div className="double-palette">
         <Nav tabs>{navElements}</Nav>
         <TabContent activeTab={activeIndex}>{paneElements}</TabContent>
-      </>
+      </div>
     );
   }
 
@@ -172,6 +197,7 @@ class LayerSettings extends React.Component {
       clearCustomPalette,
       getDefaultLegend,
       getCustomPalette,
+      globalTemperatureUnit,
       palettesTranslate,
       getPaletteLegends,
       getPalette,
@@ -212,6 +238,7 @@ class LayerSettings extends React.Component {
             <PaletteThreshold
               key={`${layer.id}0_threshold`}
               legend={legend}
+              globalTemperatureUnit={globalTemperatureUnit}
               setRange={setThresholdRange}
               min={0}
               max={max}
@@ -257,19 +284,54 @@ class LayerSettings extends React.Component {
       [customStyle] = layer.custom;
     }
     return (
-      <>
-        <VectorStyle
-          setStyle={setStyle}
-          clearStyle={clearStyle}
-          activeVectorStyle={customStyle || layer.id}
-          layer={layer}
-          index={0}
-          groupName={groupName}
-          vectorStyles={vectorStyles}
-        />
-      </>
+      <VectorStyle
+        setStyle={setStyle}
+        clearStyle={clearStyle}
+        activeVectorStyle={customStyle || layer.id}
+        layer={layer}
+        index={0}
+        groupName={groupName}
+        vectorStyles={vectorStyles}
+      />
     );
   }
+
+  /**
+   * Render Granule count slider and granule date list settings (if granule layer)
+   */
+  renderGranuleSettings = () => {
+    const {
+      layer,
+      granuleOptions,
+      screenHeight,
+      resetGranuleLayerDates,
+      updateGranuleLayerOptions,
+    } = this.props;
+    const { allowGranuleReorder } = this.state;
+    const { count, dates, granulePlatform } = granuleOptions;
+    return dates
+      ? (
+        <>
+          <GranuleCountSlider
+            def={layer}
+            count={count}
+            granuleDates={dates}
+            updateGranuleLayerOptions={updateGranuleLayerOptions}
+          />
+          {allowGranuleReorder && (
+            <GranuleLayerDateList
+              def={layer}
+              screenHeight={screenHeight}
+              granuleDates={dates}
+              granuleCount={count}
+              updateGranuleLayerOptions={updateGranuleLayerOptions}
+              resetGranuleLayerDates={resetGranuleLayerDates}
+              granulePlatform={granulePlatform}
+            />
+          )}
+        </>
+      ) : null;
+  };
 
   render() {
     let renderCustomizations;
@@ -278,14 +340,22 @@ class LayerSettings extends React.Component {
       customPalettesIsActive,
       layer,
       palettedAllowed,
+      zot,
     } = this.props;
+    const hasAssociatedLayers = layer.associatedLayers && layer.associatedLayers.length;
+    const hasTracks = layer.orbitTracks && layer.orbitTracks.length;
+    const titilerLayer = layer.id === 'HLS_Customizable_Sentinel' || layer.id === 'HLS_Customizable_Landsat';
+    const granuleMetadata = layer?.enableCMRDataFinder && !(zot?.underZoomValue > 0);
+    const layerGroup = layer.layergroup;
 
     if (layer.type !== 'vector') {
       renderCustomizations = customPalettesIsActive && palettedAllowed && layer.palette
         ? this.renderCustomPalettes()
         : '';
-    } else {
-      renderCustomizations = ''; // this.renderVectorStyles(); for future
+    } else if (layerGroup !== 'Orbital Track' && layerGroup !== 'Reference') {
+      // Orbital Tracks palette swap looks bad at WMS zoom levels (white text stamps)
+      // Reference (MGRS/HLS Grid) has no need for palettes
+      renderCustomizations = this.renderCustomPalettes();
     }
 
     if (!layer.id) return '';
@@ -296,8 +366,11 @@ class LayerSettings extends React.Component {
           setOpacity={setOpacity}
           layer={layer}
         />
+        {this.renderGranuleSettings()}
         {renderCustomizations}
-        {layer.tracks && layer.tracks.length && <OrbitTracks layer={layer} />}
+        {titilerLayer && <BandSelection layer={layer} />}
+        {granuleMetadata && <ImagerySearch layer={layer} /> }
+        {(hasAssociatedLayers || hasTracks) && <AssociatedLayers layer={layer} />}
       </>
     );
   }
@@ -305,22 +378,33 @@ class LayerSettings extends React.Component {
 
 function mapStateToProps(state, ownProps) {
   const {
-    config, palettes, compare, browser,
+    config, palettes, compare, screenSize, settings,
   } = state;
   const { custom } = palettes;
   const groupName = compare.activeString;
+  const globalTemperatureUnit = lodashGet(ownProps, 'layer.disableUnitConversion') ? '' : settings.globalTemperatureUnit;
+
+  const granuleState = getGranuleLayer(state, ownProps.layer.id);
+  const granuleOptions = {};
+  if (granuleState) {
+    const { dates, count } = granuleState;
+    granuleOptions.dates = dates;
+    granuleOptions.count = count || 20;
+    granuleOptions.granulePlatform = getGranulePlatform(state);
+  }
 
   return {
     paletteOrder: config.paletteOrder,
+    granuleOptions,
     groupName,
-    screenHeight: browser.screenHeight,
+    screenHeight: screenSize.screenHeight,
     customPalettesIsActive: !!config.features.customPalettes,
+    globalTemperatureUnit,
     palettedAllowed: isPaletteAllowed(ownProps.layer.id, config),
     palettesTranslate,
     getDefaultLegend: (layerId, index) => getDefaultLegend(layerId, index, state),
     getCustomPalette: (id) => getCustomPalette(id, custom),
     getPaletteLegend: (layerId, index) => getPaletteLegend(layerId, index, groupName, state),
-
     getPaletteLegends: (layerId) => getPaletteLegends(layerId, groupName, state),
     getPalette: (layerId, index) => getPalette(layerId, index, groupName, state),
     getVectorStyle: (layerId, index) => getVectorStyle(layerId, index, groupName, state),
@@ -363,6 +447,12 @@ const mapDispatchToProps = (dispatch) => ({
   setOpacity: (id, opacity) => {
     dispatch(setOpacity(id, opacity));
   },
+  updateGranuleLayerOptions: (dates, def, count) => {
+    dispatch(updateGranuleLayerOptions(dates, def, count));
+  },
+  resetGranuleLayerDates: (id) => {
+    dispatch(resetGranuleLayerDates(id));
+  },
 });
 
 export default connect(
@@ -383,17 +473,23 @@ LayerSettings.propTypes = {
   getPalette: PropTypes.func,
   getPaletteLegend: PropTypes.func,
   getPaletteLegends: PropTypes.func,
+  granuleOptions: PropTypes.object,
+  globalTemperatureUnit: PropTypes.string,
   groupName: PropTypes.string,
   layer: PropTypes.object,
+  onCustomizeBandClick: PropTypes.func,
   palettedAllowed: PropTypes.bool,
   paletteOrder: PropTypes.array,
   palettesTranslate: PropTypes.func,
+  resetGranuleLayerDates: PropTypes.func,
   screenHeight: PropTypes.number,
   setCustomPalette: PropTypes.func,
   setOpacity: PropTypes.func,
   setStyle: PropTypes.func,
   setThresholdRange: PropTypes.func,
   toggleClassification: PropTypes.func,
+  updateGranuleLayerOptions: PropTypes.func,
   toggleAllClassifications: PropTypes.func,
   vectorStyles: PropTypes.object,
+  zot: PropTypes.object,
 };

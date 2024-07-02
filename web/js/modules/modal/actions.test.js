@@ -1,6 +1,7 @@
+import { TextEncoder, TextDecoder } from 'util';
 import configureMockStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
-import fetchMock from 'fetch-mock';
+import { thunk } from 'redux-thunk';
+import fetchMock from 'fetch-mock-jest';
 import {
   openBasicContent,
   openCustomContent,
@@ -11,6 +12,10 @@ import {
 import * as constants from './constants';
 import util from '../../util/util';
 
+// jsdom polyfills
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 const middlewares = [thunk];
 const mockStore = configureMockStore(middlewares);
 const ERROR_MESSAGE = 'There was an error';
@@ -19,7 +24,7 @@ describe('Modal open actions', () => {
   test(
     `openBasicContent action returns ${
       constants.OPEN_BASIC
-    }header text, body text and encode key`,
+    }header text, body text and encode key [modal-actions-open]`,
     () => {
       const expectedAction = {
         type: constants.OPEN_BASIC,
@@ -33,7 +38,7 @@ describe('Modal open actions', () => {
     },
   );
 
-  test(`onToggle action returns ${constants.TOGGLE}as type`, () => {
+  test(`onToggle action returns ${constants.TOGGLE}as type [modal-actions-toggle]`, () => {
     const expectedAction = {
       type: constants.TOGGLE,
     };
@@ -43,7 +48,7 @@ describe('Modal open actions', () => {
   test(
     `openCustomContent action returns ${
       constants.OPEN_CUSTOM
-    } action type`,
+    } action type [modal-actions-open-custom]`,
     () => {
       const customsKey = 'CUSTOM_MODAL_KEY';
       const customsParams = {
@@ -64,7 +69,7 @@ describe('Modal open actions', () => {
   );
 
   test(
-    `renderTemplate action returns ${constants.RENDER_TEMPLATE} type, `,
+    `renderTemplate action returns ${constants.RENDER_TEMPLATE} type [modal-actions-render-template]`,
     () => {
       const templateModalKey = 'somePageName';
 
@@ -84,7 +89,7 @@ describe('Template fetching', () => {
   afterEach(() => {
     fetchMock.restore();
   });
-  test('triggers start and success action types', () => {
+  test('triggers start and success action types [modal-actions-success]', () => {
     const loc = 'mock/';
     fetchMock.getOnce(loc, {
       body: constants.ABOUT_MOCK_RESPONSE,
@@ -95,34 +100,34 @@ describe('Template fetching', () => {
       },
     });
     const expectedActions = [
-      { type: constants.ABOUT_PAGE_REQUEST_START },
+      { type: constants.TEMPLATE_REQUEST_START },
       {
-        type: constants.ABOUT_PAGE_REQUEST_SUCCESS,
+        type: constants.TEMPLATE_REQUEST_SUCCESS,
         response: constants.ABOUT_MOCK_RESPONSE,
       },
     ];
     const store = mockStore({ modal: {} });
     return store
-      .dispatch(requestTemplate(constants.ABOUT_PAGE_REQUEST, loc, 'text/html'))
+      .dispatch(requestTemplate(constants.TEMPLATE_REQUEST, loc, 'text/html'))
       .then(() => {
         expect(store.getActions()).toEqual(expectedActions);
       });
   });
-  test(`creates ${constants.ABOUT_PAGE_REQUEST_FAILURE} Action`, () => {
+  test(`creates ${constants.TEMPLATE_REQUEST_FAILURE} Action [modal-actions-failure]`, () => {
     const loc = 'mock/';
     fetchMock.mock(loc, {
       throws: ERROR_MESSAGE,
     });
     const expectedActions = [
-      { type: constants.ABOUT_PAGE_REQUEST_START },
+      { type: constants.TEMPLATE_REQUEST_START },
       {
-        type: constants.ABOUT_PAGE_REQUEST_FAILURE,
+        type: constants.TEMPLATE_REQUEST_FAILURE,
         error: ERROR_MESSAGE,
       },
     ];
     const store = mockStore({ modal: {} });
     return store
-      .dispatch(requestTemplate(constants.ABOUT_PAGE_REQUEST, loc, 'text/html'))
+      .dispatch(requestTemplate(constants.TEMPLATE_REQUEST, loc, 'text/html'))
       .catch(() => {
         expect(store.getActions()).toEqual(expectedActions);
       });

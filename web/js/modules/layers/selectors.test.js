@@ -55,19 +55,9 @@ test('does not add duplicate layer', () => {
 });
 
 test('resets to default layers', () => {
-  const layers = resetLayers(
-    [
-      {
-        id: 'terra-cr',
-      },
-      {
-        id: 'terra-aod',
-      },
-    ],
-    config.layers,
-  );
+  const layers = resetLayers(config);
   const layerList = getLayers(getState(layers), {}).map((x) => x.id);
-  expect(layerList).toEqual(['terra-cr', 'terra-aod']);
+  expect(layerList).toEqual(['aqua-cr', 'terra-cr', 'terra-aod']);
 });
 
 test('gets layers in reverse', () => {
@@ -194,7 +184,7 @@ test('all layers are visible', () => {
   expect(layerList).toEqual(['aqua-cr', 'terra-cr', 'aqua-aod', 'terra-aod']);
 });
 
-// NOTE: Not currently using getLayers to retrive layers that are
+// NOTE: Not currently using getLayers to retrieve layers that are
 // specifically either visible or not visible
 
 // test('only visible layers', () => {
@@ -251,6 +241,7 @@ function getDateRangesTestState(state) {
       startDate: '2000-01-01',
       endDate: '2002-01-01',
       group: 'baselayers',
+      ongoing: true,
       projections: {
         geographic: {},
       },
@@ -260,6 +251,7 @@ function getDateRangesTestState(state) {
       startDate: '2001-01-01',
       endDate: '2003-01-01',
       group: 'overlays',
+      ongoing: true,
       projections: {
         geographic: {},
       },
@@ -316,7 +308,7 @@ test('date range for ended layers', () => {
     },
     startDate: '1990-01-01',
     endDate: '2005-01-01',
-    inactive: true,
+    ongoing: false,
   };
   layersConfig.end2 = {
     id: 'end1',
@@ -326,7 +318,7 @@ test('date range for ended layers', () => {
     },
     startDate: '1992-01-01',
     endDate: '2007-01-01',
-    inactive: true,
+    ongoing: false,
   };
   const adjustedConfig = update(config, { layers: { $set: layersConfig } });
   let layers = addLayer('end1', {}, [], layersConfig);
@@ -383,9 +375,9 @@ test('no date range with static', () => {
 test('get future layer end date is 5 days after mock current date', () => {
   const testLayer = { futureTime: '5D' };
   // current date floored to quarter hour
-  const currentDate = util.roundTimeQuarterHour(new Date());
-  // test date to comopare is floored to quarter hour and added 5 days using util
-  const testDate = util.dateAdd(util.roundTimeQuarterHour(new Date()), 'day', 5);
+  const currentDate = util.roundTimeQuarterHour(util.now());
+  // test date to compare is floored to quarter hour and added 5 days using util
+  const testDate = util.dateAdd(util.roundTimeQuarterHour(util.now()), 'day', 5);
   const futureEndDate = getFutureLayerEndDate(testLayer);
 
   const testDateMinutes = testDate.getUTCMinutes();

@@ -1,20 +1,12 @@
 /* global DEBUG */
-// IE11 corejs polyfills container
-import 'core-js/stable';
+// polyfills
 import 'elm-pep';
 import 'regenerator-runtime/runtime';
-// IE11 corejs polyfills container
-import 'whatwg-fetch';
+// polyfills
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { Provider } from 'react-redux';
-import {
-  createStore,
-  applyMiddleware,
-  compose as defaultCompose,
-} from 'redux';
-import { composeWithDevTools } from 'redux-devtools-extension';
-import { calculateResponsiveState, responsiveStoreEnhancer } from 'redux-responsive';
+import { configureStore } from '@reduxjs/toolkit';
 import {
   createReduxLocationActions,
   listenForHistoryChange,
@@ -30,13 +22,14 @@ import util from './util/util';
 import Brand from './brand';
 import combineModels from './combine-models';
 import parse from './parse';
-import combineUi from './combine-ui';
+import CombineUI from './mapUI/combineUI';
 import { preloadPalettes, hasCustomTypePalette } from './modules/palettes/util';
 import {
   layersParse12,
   adjustEndDates,
   adjustActiveDateRanges,
   adjustStartDates,
+  adjustMeasurementsValidUnitConversion,
   mockFutureTimeLayerOptions,
 } from './modules/layers/util';
 import { debugConfig } from './debug';
@@ -44,23 +37,6 @@ import { CUSTOM_PALETTE_TYPE_ARRAY } from './modules/palettes/constants';
 
 const history = createBrowserHistory();
 const configURI = Brand.url('config/wv.json');
-const compose = DEBUG === false || DEBUG === 'logger'
-  ? defaultCompose
-  : DEBUG === 'devtools' && composeWithDevTools({
-    stateSanitizer: (state) => {
-      const sanitizedState = {
-        ...state,
-        map: {
-          ...state.map,
-          ui: {
-            ...state.map.ui,
-          },
-        },
-      };
-      delete sanitizedState.map.ui;
-      return sanitizedState;
-    },
-  });
 let parameters = util.fromQueryString(window.location.search);
 const errors = [];
 
@@ -96,23 +72,22 @@ function render (config, legacyState) {
     stateToParams,
   );
   const middleware = getMiddleware(DEBUG === 'logger', locationMiddleware);
-  const store = createStore(
-    reducersWithLocation,
-    getInitialState(models, config, parameters),
-    compose(
-      applyMiddleware(...middleware),
-      responsiveStoreEnhancer,
-    ),
-  );
+  const store = configureStore({
+    middleware: (getDefaultMiddleware) => [...middleware],
+    reducer: reducersWithLocation,
+    preloadedState: getInitialState(models, config, parameters),
+    devTools: true,
+  });
   listenForHistoryChange(store, history);
 
-  ReactDOM.render(
+  const root = createRoot(document.getElementById('app'));
+  root.render(
     <Provider store={store}>
       <App models={models} store={store} />
+      <CombineUI models={models} config={config} store={store} />
     </Provider>,
-    document.getElementById('app'),
   );
-  combineUi(models, config, store); // Legacy UI
+  // combineUi(models, config, store); // Legacy UI
   util.errorReport(errors);
 }
 
@@ -128,7 +103,7 @@ window.onload = () => {
       return response.json();
     })
     .then((config) => {
-    // Perform check to see if app was in the midst of a tour
+      // Perform check to see if app was in the midst of a tour
       const hasTour = lodashGet(config, `stories[${parameters.tr}]`);
       if (hasTour) {
         const isMockTour = parameters.mockTour;
@@ -137,12 +112,12 @@ window.onload = () => {
         parameters.mockTour = isMockTour;
       }
 
-      const crs = calculateResponsiveState(window);
-      config.initialIsMobile = crs.innerWidth <= 768;
+      const crs = window.innerWidth;
+      config.initialIsMobile = crs <= 768;
 
       config.pageLoadTime = parameters.now
-        ? util.parseDateUTC(parameters.now) || new Date()
-        : new Date();
+        ? util.parseDateUTC(parameters.now) || util.now()
+        : util.now();
 
       const pageLoadTime = new Date(config.pageLoadTime);
 
@@ -187,6 +162,9 @@ window.onload = () => {
         mockFutureTimeLayerOptions(config.layers, parameters.mockFutureLayer);
       }
       adjustEndDates(config.layers);
+
+      // handle checking measurements to prevent unit conversion
+      adjustMeasurementsValidUnitConversion(config);
       // Remove any mock stories
       if (!parameters.mockTour) {
         Object.keys(config.stories).forEach((storyId) => {
@@ -203,6 +181,10 @@ window.onload = () => {
         };
         render(config, parameters, legacyState);
       });
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js');
+      }
     }).catch((error) => console.error(error));
 };
 

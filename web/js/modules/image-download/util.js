@@ -2,13 +2,15 @@ import {
   each as lodashEach,
   get as lodashGet,
 } from 'lodash';
-import { boundingExtent, containsCoordinate } from 'ol/extent';
+import { transform } from 'ol/proj';
 import util from '../../util/util';
+import { formatDisplayDate } from '../date/util';
 import { nearestInterval } from '../layers/util';
-import { coordinatesCRSTransform } from '../projection/util';
+import { CRS } from '../map/constants';
 
 const GEO_ESTIMATION_CONSTANT = 256.0;
 const POLAR_ESTIMATION_CONSTANT = 0.002197265625;
+const GRANULE_LIMIT = 15;
 
 /**
  * Get a date time snapped to the interval of the layer with the shortest interval.
@@ -50,7 +52,7 @@ const imageUtilProcessKMZOrbitTracks = function(layersArray, layerWraps, opaciti
     if (layerId.includes('OrbitTracks')) {
       // track index for modifications from splicing
       const idx = i + mod;
-      // revise OrbitTracks layerId requested to indiviudal 'Lines' and 'Points' layers
+      // revise OrbitTracks layerId requested to individual 'Lines' and 'Points' layers
       // ex: 'OrbitTracks_Aqua_Ascending' is revised in the request as:
       // 'OrbitTracks_Aqua_Ascending_Points' and 'OrbitTracks_Aqua_Ascending_Lines'
       processedLayersArray.splice(idx, 1, `${layerId}_Lines`, `${layerId}_Points`);
@@ -92,64 +94,10 @@ const imageUtilProcessWrap = function(fileType, layersArray, layerWraps, opaciti
   };
 };
 
-/**
- * Get the snapshots URL to download an image
- * @param {String} url
- * @param {Object} proj
- * @param {Array} layer(s) objects
- * @param {Array} lonlats
- * @param {Object} dimensions
- * @param {Date} dateTime
- * @param {String/Boolean} fileType (false for default 'image/jpeg')
- * @param {Boolean} isWorldfile
- * @param {Array} markerCoordinates
- */
-export function getDownloadUrl(url, proj, layerDefs, lonlats, dimensions, dateTime, fileType, isWorldfile, markerCoordinates) {
-  const { crs } = proj.selected;
-  const {
-    layersArray,
-    layerWraps,
-    opacities,
-  } = imageUtilProcessWrap(
-    fileType,
-    imageUtilGetLayers(layerDefs, proj.id),
-    imageUtilGetLayerWrap(layerDefs),
-    imageUtilGetLayerOpacities(layerDefs),
-  );
-
-  const imgFormat = fileType || 'image/jpeg';
-  const { height, width } = dimensions;
-  const snappedDateTime = getLatestIntervalTime(layerDefs, dateTime);
-  const params = [
-    'REQUEST=GetSnapshot',
-    `TIME=${util.toISOStringSeconds(snappedDateTime)}`,
-    `BBOX=${bboxWMS13(lonlats, crs)}`,
-    `CRS=${crs}`,
-    `LAYERS=${layersArray.join(',')}`,
-    `WRAP=${layerWraps.join(',')}`,
-    `FORMAT=${imgFormat}`,
-    `WIDTH=${width}`,
-    `HEIGHT=${height}`,
-  ];
-  if (opacities.length > 0) {
-    params.push(`OPACITIES=${opacities.join(',')}`);
-  }
-  if (isWorldfile) {
-    params.push('WORLDFILE=true');
-  }
-  // handle adding coordinates marker
-  if (markerCoordinates.length > 0) {
-    // transform for WVS
-    const coordinates = coordinatesCRSTransform(markerCoordinates, 'EPSG:4326', crs);
-    const [longitude, latitude] = coordinates;
-    // prevent marker requests outside selected bounding box
-    const bboxExtent = boundingExtent([lonlats[0], lonlats[1]]);
-    const coordinatesWithinBbox = containsCoordinate(bboxExtent, coordinates);
-    if (coordinatesWithinBbox) {
-      params.push(`MARKER=${longitude},${latitude}`);
-    }
-  }
-  return `${url}?${params.join('&')}&ts=${Date.now()}`;
+export function imageUtilEstimateResolution(resolution, isGeoProjection) {
+  return isGeoProjection
+    ? resolution / POLAR_ESTIMATION_CONSTANT
+    : resolution / GEO_ESTIMATION_CONSTANT;
 }
 
 /*
@@ -246,6 +194,7 @@ export function imageUtilGetLayers(products, proj) {
   });
   return layers;
 }
+
 /*
  * Retrieves opacities from palettes
  *
@@ -288,32 +237,6 @@ export function imageUtilGetLayerWrap(layers) {
   }) || [];
 }
 
-export function imageUtilEstimateResolution(resolution, isGeoProjection) {
-  return isGeoProjection
-    ? resolution / POLAR_ESTIMATION_CONSTANT
-    : resolution / GEO_ESTIMATION_CONSTANT;
-}
-export function imageUtilGetConversionFactor(proj) {
-  if (proj === 'geographic') return POLAR_ESTIMATION_CONSTANT;
-  return GEO_ESTIMATION_CONSTANT;
-}
-
-/*
- * Retrieves coordinates from pixel
- *
- * @method getCoords
- * @private
- *
- * @returns {array} array of coords
- *
- */
-export function imageUtilGetCoordsFromPixelValues(pixels, map) {
-  return [
-    map.getCoordinateFromPixel([Math.floor(pixels.x), Math.floor(pixels.y2)]),
-    map.getCoordinateFromPixel([Math.floor(pixels.x2), Math.floor(pixels.y)]),
-  ];
-}
-
 /**
  * Given a bounding box as an array of a lower left coordinate pair
  * and an upper right coordinate pair, return the BBOX parameter value
@@ -321,7 +244,7 @@ export function imageUtilGetCoordsFromPixelValues(pixels, map) {
  * Y,X order, otherwise in X,Y order.
  */
 export function bboxWMS13(lonlats, crs) {
-  if (crs === 'EPSG:4326') {
+  if (crs === CRS.GEOGRAPHIC) {
     return `${lonlats[0][1]},${lonlats[0][0]},${lonlats[1][1]},${
       lonlats[1][0]
     }`;
@@ -329,6 +252,109 @@ export function bboxWMS13(lonlats, crs) {
   return `${lonlats[0][0]},${lonlats[0][1]},${lonlats[1][0]},${
     lonlats[1][1]
   }`;
+}
+
+/**
+ * Get the snapshots URL to download an image
+ * @param {String} url
+ * @param {Object} proj
+ * @param {Array} layer(s) objects
+ * @param {Array} lonlats
+ * @param {Object} dimensions
+ * @param {Date} dateTime
+ * @param {String/Boolean} fileType (false for default 'image/jpeg')
+ * @param {Boolean} isWorldfile
+ * @param {Array} markerCoordinates
+ */
+export function getDownloadUrl(url, proj, layerDefs, bbox, dimensions, dateTime, fileType, isWorldfile, markerCoordinates) {
+  const { crs } = proj.selected;
+  const {
+    layersArray,
+    layerWraps,
+    opacities,
+  } = imageUtilProcessWrap(
+    fileType,
+    imageUtilGetLayers(layerDefs, proj.id),
+    imageUtilGetLayerWrap(layerDefs),
+    imageUtilGetLayerOpacities(layerDefs),
+  );
+
+  const imgFormat = fileType || 'image/jpeg';
+  const { height, width } = dimensions;
+  const snappedDateTime = getLatestIntervalTime(layerDefs, dateTime);
+  let numGranules = 0;
+  const granuleDates = layerDefs.reduce((acc, def, i) => {
+    let granuleDatesString = acc;
+    if (!def.granuleDates) return granuleDatesString;
+    granuleDatesString = `${acc}${i};`; // ensure that each granule layer gets an index
+    if (numGranules >= GRANULE_LIMIT) return granuleDatesString; // limit number of granules
+    const numToAdd = GRANULE_LIMIT - numGranules;
+    const truncatedDates = def.granuleDates.slice(0, numToAdd);
+    numGranules += truncatedDates.length;
+    const processedDates = truncatedDates.map((date) => date.split(':').filter((d) => d !== '00Z').join(':'));
+    return `${granuleDatesString}${processedDates.join(',')},`;
+  }, '');
+  const params = [
+    'REQUEST=GetSnapshot',
+    `TIME=${util.toISOStringSeconds(snappedDateTime)}`,
+    `BBOX=${bboxWMS13(bbox, crs)}`,
+    `CRS=${crs}`,
+    `LAYERS=${layersArray.join(',')}`,
+    `WRAP=${layerWraps.join(',')}`,
+    `FORMAT=${imgFormat}`,
+    `WIDTH=${width}`,
+    `HEIGHT=${height}`,
+  ];
+  if (granuleDates.length > 0) {
+    params.push(`granule_dates=${granuleDates}`);
+  }
+  if (opacities.length > 0) {
+    params.push(`OPACITIES=${opacities.join(',')}`);
+  }
+  if (isWorldfile) {
+    params.push('WORLDFILE=true');
+  }
+
+  // handle adding coordinates marker
+  if (markerCoordinates.length > 0) {
+    const coords = markerCoordinates.reduce((validCoords, { longitude: lon, latitude: lat }) => {
+      const mCoord = transform([lon, lat], CRS.GEOGRAPHIC, crs);
+      // const inExtent = containsCoordinate(boundingExtent(bbox), mCoord);
+      return validCoords.concat([mCoord[0], mCoord[1]]);
+    }, []);
+    params.push(`MARKER=${coords.join(',')}`);
+  }
+  return `${url}?${params.join('&')}&ts=${Date.now()}`;
+}
+
+export function imageUtilGetConversionFactor(proj) {
+  if (proj === 'geographic') return POLAR_ESTIMATION_CONSTANT;
+  return GEO_ESTIMATION_CONSTANT;
+}
+
+/*
+ * Retrieves coordinates from pixel
+ * @returns {array} array of coords
+ */
+export function imageUtilGetCoordsFromPixelValues(pixels, map) {
+  const {
+    x, y, x2, y2,
+  } = pixels;
+  return [
+    map.getCoordinateFromPixel([Math.floor(x), Math.floor(y2)]),
+    map.getCoordinateFromPixel([Math.floor(x2), Math.floor(y)]),
+  ];
+}
+
+export function imageUtilGetPixelValuesFromCoords(bottomLeft, topRight, map) {
+  const [x, y2] = map.getPixelFromCoordinate([bottomLeft[0], bottomLeft[1]]);
+  const [x2, y] = map.getPixelFromCoordinate([topRight[0], topRight[1]]);
+  return {
+    x: Math.round(x),
+    y: Math.round(y),
+    x2: Math.round(x2),
+    y2: Math.round(y2),
+  };
 }
 
 export function imageSizeValid(imgHeight, imgWidth, maxSize) {
@@ -340,6 +366,7 @@ export function imageSizeValid(imgHeight, imgWidth, maxSize) {
   }
   return true;
 }
+
 export function getDimensions(projection, bounds, resolution) {
   const conversionFactor = imageUtilGetConversionFactor(projection);
   const imgWidth = Math.round(
@@ -387,7 +414,7 @@ export function getNamesOfNondownloadableLayers(nonDownloadableLayers) {
   return names;
 }
 /**
- * Get warning that shows layers that will be removed if nofication is accepted
+ * Get warning that shows layers that will be removed if notification is accepted
  * @param {Array} nonDownloadableLayers
  *
  * @return {String}
@@ -401,11 +428,43 @@ export function getNonDownloadableLayerWarning(nonDownloadableLayer) {
   return `The ${layerStr} ${layerPluralStr} cannot be included in a snapshot. Would you like to temporarily hide ${thisTheseStr} layer?`;
 }
 /**
- * Get array of layers that will be removed if nofication is accepted
+ * Get array of layers that will be removed if notification is accepted
  * @param {Array} visibleLayers
  *
  * @return {Array}
  */
 export function getNonDownloadableLayers(visibleLayers) {
   return visibleLayers.filter(({ disableSnapshot = false }) => disableSnapshot);
+}
+/**
+ * Get dateline message for selecting snapshot area
+ * @param {Object} date
+ * @param {Array} geolonlat1
+ * @param {Array} geolonlat2
+ * @param {Object} proj
+ *
+ * @return {String}
+ */
+export function getAlertMessageIfCrossesDateline(date, geolonlat1, geolonlat2, proj) {
+  const { maxExtent, id } = proj.selected;
+  let alertMessage = '';
+  if (id === 'geographic') {
+    const crossesNextDay = geolonlat1[0] < maxExtent[0];
+    const crossesPrevDay = geolonlat2[0] > maxExtent[2];
+    const zeroedDate = util.clearTimeUTC(date);
+    const nextDay = formatDisplayDate(util.dateAdd(zeroedDate, 'day', 1));
+    const prevDay = formatDisplayDate(util.dateAdd(zeroedDate, 'day', -1));
+    const buildString = (lineStr, dateStr) => `The selected snapshot area crosses ${lineStr} and uses imagery from the ${dateStr}.`;
+    if (crossesNextDay && crossesPrevDay) {
+      // snapshot extends over both map wings
+      alertMessage = buildString('both datelines', `previous day ${prevDay} and next day ${nextDay}`);
+    } else if (crossesNextDay) {
+      // min longitude less than maxExtent min longitude (-180 geographic)
+      alertMessage = buildString('the dateline', `next day ${nextDay}`);
+    } else if (crossesPrevDay) {
+      // max longitude greater than maxExtent max longitude (180 geographic)
+      alertMessage = buildString('the dateline', `previous day ${prevDay}`);
+    }
+  }
+  return alertMessage;
 }

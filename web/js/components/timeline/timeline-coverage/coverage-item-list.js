@@ -5,9 +5,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { datesInDateRanges } from '../../../modules/layers/util';
 import util from '../../../util/util';
 import {
-  timeScaleToNumberKey,
+  TIME_SCALE_TO_NUMBER,
 } from '../../../modules/date/constants';
 import CoverageItemContainer from './coverage-item-container';
+import { formatDisplayDate } from '../../../modules/date/util';
+import MonospaceDate from '../../util/monospace-date';
+import { SIDEBAR_LAYER_HOVER } from '../../../util/constants';
 
 const { events } = util;
 
@@ -34,16 +37,16 @@ class CoverageItemList extends Component {
   }
 
   componentDidMount() {
-    events.on('sidebar:layer-hover', this.layerHoverCallback);
+    events.on(SIDEBAR_LAYER_HOVER, this.layerHoverCallback);
   }
 
   componentWillUnmount() {
-    events.off('sidebar:layer-hover', this.layerHoverCallback);
+    events.off(SIDEBAR_LAYER_HOVER, this.layerHoverCallback);
   }
 
   layerHoverCallback = (id, active) => {
     this.setState({ hoveredLayer: active ? id : undefined });
-  }
+  };
 
   /**
   * @desc get layer header with title, subtitle, and full date range
@@ -53,43 +56,56 @@ class CoverageItemList extends Component {
   * @param {String} background color
   * @returns {DOM Element} header
   */
-  getHeaderDOMEl = (layer, visible, dateRange, layerItemBackground) => {
+  getHeaderDOMEl = (layer, visible, layerItemBackground, inactiveLayers) => {
     const titleColor = visible ? '#000' : '#999';
     const textColor = visible ? '#222' : '#999';
-    const { subtitle, title } = layer;
+    const {
+      subtitle, title, startDate, endDate,
+    } = layer;
+    const formattedStartDate = startDate && formatDisplayDate(new Date(startDate));
+    const formattedEndDate = endDate && formatDisplayDate(new Date(endDate));
+    const baseStyle = { width: '110px', display: 'inline-block' };
+    const getStyle = (date) => (
+      date
+        ? { ...baseStyle, textAlign: 'center' }
+        : { ...baseStyle, paddingLeft: '2px' }
+    );
+
     return (
-      <>
-        <div className="layer-coverage-item-header">
-          <div
-            className="layer-coverage-item-title"
+      <div className="layer-coverage-item-header">
+        <div
+          className="layer-coverage-item-title"
+          style={{
+            color: titleColor,
+          }}
+        >
+          {title}
+          {' '}
+          <span
+            className="layer-coverage-item-subtitle"
             style={{
-              color: titleColor,
-            }}
-          >
-            {title}
-            {' '}
-            <span
-              className="layer-coverage-item-subtitle"
-              style={{
-                color: textColor,
-              }}
-            >
-              {subtitle}
-            </span>
-          </div>
-          <div
-            className="layer-coverage-item-date-range"
-            style={{
-              background: layerItemBackground,
               color: textColor,
             }}
           >
-            {dateRange}
-          </div>
+            {subtitle}
+          </span>
         </div>
-      </>
+        <div
+          className="layer-coverage-item-date-range"
+          style={{
+            background: layerItemBackground,
+            color: textColor,
+            float: 'left',
+            width: inactiveLayers || formattedEndDate ? '205px' : '175px',
+          }}
+        >
+          <MonospaceDate style={getStyle(formattedStartDate)} date={formattedStartDate || ' Start '} />
+          {' -  '}
+          <MonospaceDate style={getStyle(formattedEndDate)} date={formattedEndDate || ' Present '} />
+        </div>
+      </div>
     );
-  }
+  };
 
   /**
   * @desc get formatted time period name
@@ -102,7 +118,7 @@ class CoverageItemList extends Component {
       ? 'month'
       : period === 'yearly'
         ? 'year'
-        : 'minute')
+        : 'minute');
 
   /**
   * @desc get range date end with added interval based on period
@@ -158,36 +174,7 @@ class CoverageItemList extends Component {
       }
     }
     return new Date(rangeDateEnd).toISOString();
-  }
-
-  /**
-  * @desc get formatted, readable date range for header
-  * @param {Object} layer
-  * @returns {String} dateRangeText
-  */
-  getFormattedDateRange = (layer) => {
-    // get start date -or- 'start'
-    const {
-      endDate, startDate,
-    } = layer;
-    let dateRangeStart;
-    if (startDate) {
-      dateRangeStart = util.toISOStringDateMonthAbbrev(new Date(startDate));
-    } else {
-      dateRangeStart = 'Start';
-    }
-
-    // get end date -or- 'present'
-    let dateRangeEnd;
-    if (endDate) {
-      dateRangeEnd = util.toISOStringDateMonthAbbrev(new Date(endDate));
-    } else {
-      dateRangeEnd = 'Present';
-    }
-
-    const dateRangeText = `${dateRangeStart} to ${dateRangeEnd}`;
-    return dateRangeText;
-  }
+  };
 
   /**
   * @desc get endDateLimit based on axis and appNow
@@ -200,7 +187,7 @@ class CoverageItemList extends Component {
       appNow,
       backDate,
     } = this.props;
-    const { endDate, futureTime, inactive } = layer;
+    const { endDate, futureTime, ongoing } = layer;
 
     let endDateLimit = new Date(backDate);
     const layerEndDate = new Date(endDate);
@@ -210,7 +197,7 @@ class CoverageItemList extends Component {
       endDateLimit = appNowDate;
     }
     // if last date of multiple ranges check for endDate over appNow date
-    if (!inactive && isLastInRange) {
+    if (ongoing && isLastInRange) {
       if (futureTime && endDate) {
         if (endDateLimit > layerEndDate) {
           endDateLimit = layerEndDate;
@@ -221,7 +208,7 @@ class CoverageItemList extends Component {
     }
 
     return endDateLimit;
-  }
+  };
 
   /**
   * @desc get array of dates for layer
@@ -238,7 +225,7 @@ class CoverageItemList extends Component {
       frontDate,
     } = this.props;
     const {
-      futureTime, period, id, inactive,
+      futureTime, period, id, ongoing,
     } = def;
     const { dateInterval, startDate, endDate } = range;
 
@@ -261,7 +248,7 @@ class CoverageItemList extends Component {
 
     // rangeEnd for last time coverage section of active layers can't be greater than appNow
     const appNowDate = new Date(appNow);
-    if (!inactive && isLastInRange) {
+    if (ongoing && isLastInRange) {
       if (futureTime) {
         rangeEnd = new Date(endDate);
       } else {
@@ -288,7 +275,7 @@ class CoverageItemList extends Component {
       }
     }
     return dateIntervalStartDates;
-  }
+  };
 
   /**
   * @desc get conditional styling for layer container and coverage line
@@ -327,7 +314,7 @@ class CoverageItemList extends Component {
       layerItemBackground,
       layerItemOutline,
     };
-  }
+  };
 
   /**
   * @desc get empty layers message DOM element
@@ -340,7 +327,7 @@ class CoverageItemList extends Component {
         <p>No visible layers with defined coverage. Add layers or toggle &quot;Include Hidden Layers&quot; if current layers are hidden.</p>
       </div>
     </div>
-  )
+  );
 
   render() {
     const {
@@ -353,6 +340,7 @@ class CoverageItemList extends Component {
       positionTransformX,
     } = this.props;
     const emptyLayers = activeLayers.length === 0;
+    const inactiveLayers = activeLayers.some(({ ongoing }) => !ongoing);
     return (
       <div className="layer-coverage-layer-list">
         {/* Empty layer coverage message */
@@ -380,8 +368,8 @@ class CoverageItemList extends Component {
           let layerPeriod = this.getFormattedTimePeriod(period);
 
           // get layer scale number to determine relation to current axis zoom level
-          const timeScaleNumber = timeScaleToNumberKey[timeScale];
-          const layerScaleNumber = timeScaleToNumberKey[layerPeriod];
+          const timeScaleNumber = TIME_SCALE_TO_NUMBER[timeScale];
+          const layerScaleNumber = TIME_SCALE_TO_NUMBER[layerPeriod];
           const isLayerGreaterIncrementThanZoom = layerScaleNumber < timeScaleNumber;
           const isLayerEqualIncrementThanZoom = layerScaleNumber === timeScaleNumber;
 
@@ -395,7 +383,6 @@ class CoverageItemList extends Component {
           } = this.getLayerItemStyles(visible, id);
 
           // get date range
-          const dateRange = this.getFormattedDateRange(layer);
           const dateRangeIntervalZeroIndex = dateRanges
             ? Number(dateRanges[0].dateInterval)
             : 1;
@@ -418,7 +405,7 @@ class CoverageItemList extends Component {
               }}
             >
               {/* Layer Header DOM El */
-                this.getHeaderDOMEl(layer, visible, dateRange, layerItemBackground)
+                this.getHeaderDOMEl(layer, visible, layerItemBackground, inactiveLayers)
               }
               <div
                 className="layer-coverage-line-container"

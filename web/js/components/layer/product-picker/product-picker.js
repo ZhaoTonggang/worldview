@@ -19,6 +19,7 @@ import {
   saveSearchState as saveSearchStateAction,
 } from '../../../modules/product-picker/actions';
 import util from '../../../util/util';
+import { JOYRIDE_INCREMENT } from '../../../util/constants';
 
 const { events } = util;
 
@@ -39,7 +40,7 @@ class ProductPicker extends React.Component {
     const modalElement = document.getElementById('layer_picker_component');
     this.setState({ modalElement }, () => {
       setTimeout(() => {
-        events.trigger('joyride:increment');
+        events.trigger(JOYRIDE_INCREMENT);
       }, 200);
       this.setModalClass();
     });
@@ -80,10 +81,14 @@ class ProductPicker extends React.Component {
       mode,
       width,
     } = this.props;
-
+    const closeBtn = (
+      <button className="layer-btn-close" onClick={closeModal} style={mode === 'search' ? { top: '-10px' } : {}} type="button">
+        &times;
+      </button>
+    );
     return (
       <>
-        <ModalHeader toggle={() => closeModal()}>
+        <ModalHeader toggle={closeModal} close={closeBtn}>
           <ProductPickerHeader
             width={width}
             toggleFilterByAvailable={this.toggleFilterByAvailable}
@@ -120,17 +125,32 @@ const mapDispatchToProps = (dispatch) => ({
   },
 });
 
+const getModalWidth = function(width) {
+  const availableWidth = width - width * 0.15;
+  const gridItemWidth = 310;
+  let sizeMultiplier = Math.floor(availableWidth / gridItemWidth);
+  if (sizeMultiplier < 1) {
+    sizeMultiplier = 1;
+  }
+  if (sizeMultiplier > 3) {
+    sizeMultiplier = 3;
+  }
+  const gutterSpace = (sizeMultiplier - 1) * 10;
+  const modalPadding = 26;
+  return gridItemWidth * sizeMultiplier + gutterSpace + modalPadding;
+};
+
 const mapStateToProps = (state) => {
   const {
-    browser,
+    screenSize,
     productPicker,
   } = state;
-  const { screenWidth } = browser;
+  const { screenWidth } = screenSize;
   const width = getModalWidth(screenWidth);
   const { mode, category, categoryType } = productPicker;
 
   return {
-    browser,
+    screenSize,
     category,
     categoryType,
     mode,
@@ -148,18 +168,3 @@ export default withSearch(
   mapStateToProps,
   mapDispatchToProps,
 )(ProductPicker));
-
-const getModalWidth = function(width) {
-  const availableWidth = width - width * 0.15;
-  const gridItemWidth = 310;
-  let sizeMultiplier = Math.floor(availableWidth / gridItemWidth);
-  if (sizeMultiplier < 1) {
-    sizeMultiplier = 1;
-  }
-  if (sizeMultiplier > 3) {
-    sizeMultiplier = 3;
-  }
-  const gutterSpace = (sizeMultiplier - 1) * 10;
-  const modalPadding = 26;
-  return gridItemWidth * sizeMultiplier + gutterSpace + modalPadding;
-};

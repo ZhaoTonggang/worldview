@@ -2,13 +2,15 @@
 
 build/*
 dist/*
+e2e/reports/*
 etc/*
+legacy/*
 lib/*
 options/*
 reports/*
-web/ext/*
-web/dist/*
-web/build/*
+tasks/temp/*
 test/*
-web/js/edsc/*
-
+web/build/*
+web/dist/*
+web/ext/*
+web/js/lib/*

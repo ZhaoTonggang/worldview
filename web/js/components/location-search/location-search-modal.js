@@ -2,18 +2,18 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import {
-  Button, InputGroup, InputGroupAddon,
+  Button, InputGroup,
 } from 'reactstrap';
 import {
   debounce as lodashDebounce,
   get as lodashGet,
 } from 'lodash';
-import googleTagManager from 'googleTagManager';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import googleTagManager from 'googleTagManager';
 import SearchBox from './location-search-input';
 import Alert from '../util/alert';
 import HoverTooltip from '../util/hover-tooltip';
-import { getCoordinateFixedPrecision, isValidCoordinates } from './util';
+import { isValidCoordinates } from './util';
 import {
   clearSuggestions,
   getSuggestions,
@@ -83,7 +83,7 @@ class LocationSearchModal extends Component {
   getSuggestions = (val) => {
     const { getSuggestions } = this.props;
     getSuggestions(val);
-  }
+  };
 
   // dismiss message instruction alert
   dismissReverseGeocodeAlert = () => this.setState({ showReverseGeocodeAlert: false });
@@ -105,7 +105,7 @@ class LocationSearchModal extends Component {
       showNoSuggestionsAlert: false,
       showReverseGeocodeAlert: false,
     });
-  }
+  };
 
   // handle submitting search after inputting coordinates
   onCoordinateInputSelect = () => {
@@ -133,7 +133,7 @@ class LocationSearchModal extends Component {
       clearSuggestions();
       updatePendingCoordinates([]);
     }
-  }
+  };
 
   // handle selecting menu item in search results
   onSelect = (value, item) => {
@@ -158,21 +158,18 @@ class LocationSearchModal extends Component {
         const firstCandidate = result.candidates[0];
         const { location, attributes } = firstCandidate;
         const addressAttributes = { address: attributes };
-
         const { x, y } = location;
-        const parsedX = getCoordinateFixedPrecision(x);
-        const parsedY = getCoordinateFixedPrecision(y);
 
-        const coordinatesWithinExtent = isCoordinatePairWithinExtent([parsedX, parsedY]);
+        const coordinatesWithinExtent = isCoordinatePairWithinExtent([x, y]);
         if (!coordinatesWithinExtent) {
           this.setExtentAlert(true);
           this.setInputAlertIcon(true);
         } else {
-          setPlaceMarker([parsedX, parsedY], addressAttributes);
+          setPlaceMarker([x, y], addressAttributes);
         }
       }
     }).catch((error) => console.error(error));
-  }
+  };
 
   // handle input value change including text/coordinates typing, pasting, cutting
   onChange = (e, value) => {
@@ -188,7 +185,7 @@ class LocationSearchModal extends Component {
     const coordinatesInputValue = isValidCoordinates(value);
     if (coordinatesInputValue) {
       this.debounceGetSuggestions.cancel();
-      const { latitude, longitude } = coordinatesInputValue;
+      const { longitude, latitude } = coordinatesInputValue;
       this.clearAlerts();
       clearSuggestions();
       updatePendingCoordinates([longitude, latitude]);
@@ -200,7 +197,7 @@ class LocationSearchModal extends Component {
       // provide suggestions to populate search result menu item(s)
       this.debounceGetSuggestions(value);
     }
-  }
+  };
 
   // clear text input and search results
   clearInput = () => {
@@ -211,7 +208,7 @@ class LocationSearchModal extends Component {
     updateValue('');
     clearSuggestions();
     this.clearAlerts();
-  }
+  };
 
   // initiate instruction alert and activate store level toggleReverseGeocodeActive
   initReverseGeocode = (e) => {
@@ -230,7 +227,7 @@ class LocationSearchModal extends Component {
     googleTagManager.pushEvent({
       event: 'location_search_reverse_geocode',
     });
-  }
+  };
 
   renderTooltip = (buttonId, labelText) => {
     const { isMobile } = this.props;
@@ -241,7 +238,7 @@ class LocationSearchModal extends Component {
         target={buttonId}
       />
     );
-  }
+  };
 
   // render alert message to instruct user map interaction
   renderReverseGeocodeAlert = () => {
@@ -262,7 +259,7 @@ class LocationSearchModal extends Component {
         onDismiss={this.dismissReverseGeocodeAlert}
       />
     );
-  }
+  };
 
   // render alert message to indicate entered location is outside of map extent
   renderExtentAlert = () => {
@@ -281,7 +278,7 @@ class LocationSearchModal extends Component {
         onDismiss={() => this.setExtentAlert(false)}
       />
     );
-  }
+  };
 
   // render alert message to indicate no suggestions for input value
   renderNoSuggestionsAlert = () => {
@@ -300,7 +297,7 @@ class LocationSearchModal extends Component {
         onDismiss={() => this.setNoSuggestionsAlert(false)}
       />
     );
-  }
+  };
 
   // render Location Search component minimize button (not visible in mobile)
   renderMinimizeButton = () => {
@@ -308,18 +305,16 @@ class LocationSearchModal extends Component {
     const buttonId = 'location-search-minimize-button';
     const labelText = 'Hide Location Search';
     return (
-      <InputGroupAddon addonType="prepend">
-        <Button
-          id={buttonId}
-          className={buttonId}
-          onClick={toggleShowLocationSearch}
-        >
-          {this.renderTooltip(buttonId, labelText)}
-          <div className={`${buttonId}-chevron`} />
-        </Button>
-      </InputGroupAddon>
+      <Button
+        id={buttonId}
+        className={buttonId}
+        onClick={toggleShowLocationSearch}
+      >
+        {this.renderTooltip(buttonId, labelText)}
+        <div className={`${buttonId}-chevron`} />
+      </Button>
     );
-  }
+  };
 
   // render add coordinate marker button for reverse geocode
   renderAddCoordinateButton = () => {
@@ -327,19 +322,17 @@ class LocationSearchModal extends Component {
     const labelText = 'Add marker on map';
 
     return (
-      <InputGroupAddon addonType="append">
-        <Button
-          id={buttonId}
-          onTouchEnd={this.initReverseGeocode}
-          onMouseDown={this.initReverseGeocode}
-          className={buttonId}
-        >
-          {this.renderTooltip(buttonId, labelText)}
-          <FontAwesomeIcon icon="map-marker-alt" size="1x" />
-        </Button>
-      </InputGroupAddon>
+      <Button
+        id={buttonId}
+        onTouchEnd={this.initReverseGeocode}
+        onMouseDown={this.initReverseGeocode}
+        className={buttonId}
+      >
+        {this.renderTooltip(buttonId, labelText)}
+        <FontAwesomeIcon icon="map-marker-alt" size="1x" />
+      </Button>
     );
-  }
+  };
 
   render() {
     const {
@@ -354,14 +347,23 @@ class LocationSearchModal extends Component {
       showInputAlert,
     } = this.state;
 
+    const locationSearchMobileStyle = isMobile ? {
+      position: 'static',
+      width: '100%',
+    } : null;
+
+    const locationSearchInputGroupMobileStyle = isMobile ? {
+      width: '100% !important',
+    } : null;
+
     return (
-      <div id="location-search-wrapper" className="location-search-expanded">
+      <div id="location-search-wrapper" className="location-search-expanded" style={locationSearchMobileStyle}>
         {/* Alerts */}
         {this.renderReverseGeocodeAlert()}
         {this.renderNoSuggestionsAlert()}
         {this.renderExtentAlert()}
         <div className="location-search-component">
-          <InputGroup className="location-search-input-group">
+          <InputGroup className="location-search-input-group" style={locationSearchInputGroupMobileStyle}>
             {/* Minimize button not visible in mobile */}
             {!isMobile && this.renderMinimizeButton()}
             <SearchBox
@@ -388,7 +390,7 @@ class LocationSearchModal extends Component {
 
 const mapStateToProps = (state) => {
   const {
-    browser,
+    screenSize,
     config,
     lastAction,
     proj,
@@ -401,7 +403,7 @@ const mapStateToProps = (state) => {
     suggestions,
     suggestedPlace,
   } = locationSearch;
-  const isMobile = browser.lessThan.medium;
+  const isMobile = screenSize.isMobileDevice;
   const locationSearchMobileModalOpen = modal.isOpen && modal.id === 'TOOLBAR_LOCATION_SEARCH_MOBILE';
   // Collapse when image download, GIF, measure tool, or distraction free mode is active
   const measureToggledOff = lastAction.type === 'MEASURE/TOGGLE_MEASURE_ACTIVE' && lastAction.value === false;

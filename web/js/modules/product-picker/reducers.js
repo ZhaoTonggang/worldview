@@ -1,5 +1,5 @@
-import googleTagManager from 'googleTagManager';
 import { get as lodashGet } from 'lodash';
+import googleTagManager from 'googleTagManager';
 
 import {
   SAVE_SEARCH_STATE,
@@ -166,7 +166,7 @@ export function productPickerReducer(state = productPickerState, action) {
       return {
         ...state,
         categoryType: 'featured',
-        category,
+        category: null,
         mode: 'measurements',
         selectedLayer: null,
         selectedMeasurement: selectedMeasurementId,
@@ -198,6 +198,7 @@ export function productPickerReducer(state = productPickerState, action) {
       return {
         ...state,
         mode: 'category',
+        category: null,
         selectedLayer: null,
         selectedMeasurement: null,
         selectedMeasurementSourceIndex: 0,

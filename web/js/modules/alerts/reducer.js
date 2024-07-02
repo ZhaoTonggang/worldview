@@ -1,36 +1,78 @@
 import { assign as lodashAssign } from 'lodash';
-import { TOGGLE_VECTOR_ALERT, DISABLE_VECTOR_ALERT, ACTIVATE_VECTOR_ALERT } from './constants';
+import {
+  DISABLE_VECTOR_ZOOM_ALERT,
+  ACTIVATE_VECTOR_ZOOM_ALERT,
+  DISABLE_VECTOR_EXCEEDED_ALERT,
+  ACTIVATE_VECTOR_EXCEEDED_ALERT,
+  ACTIVATE_DDV_ZOOM_ALERT,
+  ACTIVATE_DDV_LOCATION_ALERT,
+  DEACTIVATE_DDV_LOCATION_ALERT,
+  DEACTIVATE_DDV_ZOOM_ALERT,
+} from './constants';
 import { hasVectorLayers } from '../layers/util';
 import { REMOVE_LAYER, REMOVE_GROUP } from '../layers/constants';
+import { UPDATE_MAP_EXTENT } from '../map/constants';
 
 export const defaultAlertState = {
-  isVectorAlertActive: false,
+  isVectorZoomAlertPresent: false,
+  isVectorExceededAlertPresent: false,
+  isDDVZoomAlertPresent: false,
+  isDDVLocationAlertPresent: false,
+  ddvZoomAlerts: [],
+  ddvLocationAlerts: [],
 };
 
 export function alertReducer(state = defaultAlertState, action) {
   switch (action.type) {
-    case TOGGLE_VECTOR_ALERT:
+    case DISABLE_VECTOR_ZOOM_ALERT:
       return lodashAssign({}, state, {
-        isVectorAlertActive: !state.isVectorAlertActive,
+        isVectorZoomAlertPresent: false,
       });
-    case DISABLE_VECTOR_ALERT:
+    case ACTIVATE_VECTOR_ZOOM_ALERT:
       return lodashAssign({}, state, {
-        isVectorAlertActive: false,
+        isVectorZoomAlertPresent: true,
       });
-    case ACTIVATE_VECTOR_ALERT:
+    case DISABLE_VECTOR_EXCEEDED_ALERT:
+    case UPDATE_MAP_EXTENT:
       return lodashAssign({}, state, {
-        isVectorAlertActive: true,
+        isVectorExceededAlertPresent: false,
+      });
+    case ACTIVATE_VECTOR_EXCEEDED_ALERT:
+      return lodashAssign({}, state, {
+        isVectorExceededAlertPresent: true,
+        isVectorZoomAlertPresent: false,
       });
     case REMOVE_LAYER:
     case REMOVE_GROUP:
-      if (!state.isVectorAlertActive) {
+      if (!state.isVectorZoomAlertPresent && !state.isVectorExceededAlertPresent) {
         return state;
       } if (!hasVectorLayers(action.layers)) {
         return lodashAssign({}, state, {
-          isVectorAlertActive: false,
+          isVectorZoomAlertPresent: false,
+          isVectorExceededAlertPresent: false,
         });
       }
       return state;
+    case ACTIVATE_DDV_ZOOM_ALERT:
+      return lodashAssign({}, state, {
+        isDDVZoomAlertPresent: true,
+        ddvZoomAlerts: [...state.ddvZoomAlerts, action.title],
+      });
+    case ACTIVATE_DDV_LOCATION_ALERT:
+      return lodashAssign({}, state, {
+        isDDVLocationAlertPresent: true,
+        ddvLocationAlerts: [...state.ddvLocationAlerts, action.title],
+      });
+    case DEACTIVATE_DDV_ZOOM_ALERT:
+      return lodashAssign({}, state, {
+        isDDVZoomAlertPresent: state.ddvZoomAlerts.length > 1,
+        ddvZoomAlerts: state.ddvZoomAlerts.filter((title) => title !== action.title),
+      });
+    case DEACTIVATE_DDV_LOCATION_ALERT:
+      return lodashAssign({}, state, {
+        isDDVLocationAlertPresent: state.ddvLocationAlerts.length > 1,
+        ddvLocationAlerts: state.ddvLocationAlerts.filter((title) => title !== action.title),
+      });
 
     default:
       return state;

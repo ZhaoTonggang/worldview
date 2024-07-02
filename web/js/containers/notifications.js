@@ -4,11 +4,23 @@ import { connect } from 'react-redux';
 import NotificationBlock from '../components/notifications/notification-block';
 import { getNumberOfTypeNotSeen } from '../modules/notifications/util';
 
-const Notifications = (props) => {
-  const { object } = props;
+function Notifications(props) {
+  const { kioskModeEnabled, numberOutagesUnseen, object } = props;
   const {
     messages, outages, alerts,
   } = object;
+
+  if (numberOutagesUnseen > 0 && !kioskModeEnabled) {
+    return (
+      <div className="wv-notify-modal">
+        <NotificationBlock
+          arr={outages}
+          type="outage"
+          numberNotSeen={getNumberOfTypeNotSeen('outage', outages)}
+        />
+      </div>
+    );
+  }
   return (
     <div className="wv-notify-modal">
       <NotificationBlock
@@ -28,11 +40,13 @@ const Notifications = (props) => {
       />
     </div>
   );
-};
+}
 function mapStateToProps(state) {
-  const { object } = state.notifications;
-
+  const { object, numberOutagesUnseen } = state.notifications;
+  const kioskModeEnabled = (state.ui.eic !== null && state.ui.eic !== '') || state.ui.isKioskModeActive;
   return {
+    kioskModeEnabled,
+    numberOutagesUnseen,
     object,
   };
 }
@@ -44,4 +58,5 @@ export default connect(
 
 Notifications.propTypes = {
   object: PropTypes.object,
+  numberOutagesUnseen: PropTypes.number,
 };

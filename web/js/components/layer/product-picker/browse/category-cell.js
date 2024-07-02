@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const CategoryCell = (props) => {
+function CategoryCell(props) {
   const {
     category,
     measurementConfig,
@@ -16,6 +16,13 @@ const CategoryCell = (props) => {
       backgroundImage: `url(${bgImage})`,
     }
     : {};
+
+  const checkForSources = (measurement) => {
+    if (measurementConfig[measurement]) {
+      return hasMeasurementSource(measurementConfig[measurement]);
+    }
+    throw new Error(`No measurement config entry for "${measurement}".`);
+  };
 
   return (
     <div
@@ -36,7 +43,7 @@ const CategoryCell = (props) => {
           </h3>
           <ul>
             {category.measurements
-              .filter((measurement) => hasMeasurementSource(measurementConfig[measurement]))
+              .filter(checkForSources)
               .slice(0, 7)
               .map((measurement, index) => {
                 const current = measurementConfig[measurement];
@@ -94,7 +101,7 @@ const CategoryCell = (props) => {
       </div>
     </div>
   );
-};
+}
 
 CategoryCell.propTypes = {
   category: PropTypes.object,

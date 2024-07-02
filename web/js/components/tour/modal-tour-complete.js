@@ -4,11 +4,16 @@ import {
   Modal, ModalHeader, ModalBody, ModalFooter,
 } from 'reactstrap';
 
-const ModalComplete = (props) => {
+function ModalComplete(props) {
   const {
     currentStory, modalComplete, resetTour, endTour,
   } = props;
   const { readMoreLinks } = currentStory;
+  const closeBtn = (
+    <button className="tour-close-btn" onClick={endTour} type="button">
+      &times;
+    </button>
+  );
   let list;
   if (
     readMoreLinks
@@ -40,15 +45,15 @@ const ModalComplete = (props) => {
         fade={false}
         keyboard
       >
-        <ModalHeader toggle={endTour}>
+        <ModalHeader close={closeBtn}>
           Story Complete
         </ModalHeader>
         <ModalBody>
           <p>
-            You have now completed a story in Worldview. To view more stories,
+            You have now completed a story in @NAME@. To view more stories,
             click the &ldquo;More Stories&rdquo; button below to explore more events
             within the app. Click the &ldquo;Exit Tutorial&rdquo; button or close this
-            window to start using Worldview on your own.
+            window to start using @NAME@ on your own.
           </p>
           {list}
         </ModalBody>
@@ -71,7 +76,7 @@ const ModalComplete = (props) => {
       </Modal>
     </div>
   );
-};
+}
 
 ModalComplete.propTypes = {
   currentStory: PropTypes.object.isRequired,

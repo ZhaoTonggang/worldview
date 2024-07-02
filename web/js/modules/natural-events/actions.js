@@ -13,6 +13,8 @@ import {
   DESELECT_EVENT,
   SET_EVENTS_FILTER,
   FINISHED_ANIMATING_TO_EVENT,
+  HIGHLIGHT_EVENT,
+  UNHIGHLIGHT_EVENT,
 } from './constants';
 import { requestAction } from '../core/actions';
 
@@ -41,12 +43,16 @@ export function requestSources() {
       console.warn(`Using mock sources data: ${mockSources}`);
       sourcesURL = `mock/sources_data.json-${mockSources}`;
     }
-    requestAction(
-      dispatch,
-      REQUEST_SOURCES,
-      sourcesURL,
-      'application/json',
-    );
+    try {
+      requestAction(
+        dispatch,
+        REQUEST_SOURCES,
+        sourcesURL,
+        'application/json',
+      );
+    } catch (e) {
+      console.error(e);
+    }
   };
 }
 
@@ -64,7 +70,7 @@ export function deselectEvent(id, date) {
   };
 }
 
-export function setEventsFilter(categories, start, end, showAll) {
+export function setEventsFilter(categories, start, end, showAll, showAllTracks) {
   return (dispatch, getState) => {
     const {
       selectedCategories,
@@ -80,11 +86,26 @@ export function setEventsFilter(categories, start, end, showAll) {
       start,
       end,
       showAll,
+      showAllTracks,
     });
     // Only make request if something has changed
     if (!showAll || (prevShowAll !== showAll) || !sameCategories || !sameDates) {
       dispatch(requestEvents(requestUrl));
     }
+  };
+}
+
+export function highlightEvent(id, eventDate) {
+  return {
+    type: HIGHLIGHT_EVENT,
+    id,
+    date: eventDate,
+  };
+}
+
+export function unHighlightEvent(id, date) {
+  return {
+    type: UNHIGHLIGHT_EVENT,
   };
 }
 

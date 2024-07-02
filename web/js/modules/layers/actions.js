@@ -1,15 +1,19 @@
-import { findIndex as lodashFindIndex } from 'lodash';
-import googleTagManager from 'googleTagManager';
+import {
+  findIndex as lodashFindIndex,
+} from 'lodash';
 import update from 'immutability-helper';
+import googleTagManager from 'googleTagManager';
 import {
   addLayer as addLayerSelector,
-  resetLayers as resetLayersSelector,
   getLayers as getLayersSelector,
   getActiveLayers as getActiveLayersSelector,
   activateLayersForEventCategory as activateLayersForEventCategorySelector,
+  findEventLayers,
+  getGranuleLayer,
+  getGranuleLayersOfActivePlatform,
+  getActiveGranuleLayers,
 } from './selectors';
 import {
-  RESET_LAYERS,
   ADD_LAYER,
   INIT_SECOND_LAYER_GROUP,
   REORDER_LAYERS,
@@ -22,25 +26,18 @@ import {
   REMOVE_GROUP,
   UPDATE_OPACITY,
   ADD_LAYERS_FOR_EVENT,
+  ADD_GRANULE_LAYER_DATES,
+  UPDATE_GRANULE_LAYER_OPTIONS,
+  UPDATE_GRANULE_LAYER_GEOMETRY,
+  RESET_GRANULE_LAYER_OPTIONS,
+  CHANGE_GRANULE_SATELLITE_INSTRUMENT_GROUP,
+  UPDATE_COLLECTION,
+  UPDATE_DDV_LAYER,
 } from './constants';
 import { updateRecentLayers } from '../product-picker/util';
 import { getOverlayGroups, getLayersFromGroups } from './util';
 import safeLocalStorage from '../../util/local-storage';
-
-export function resetLayers(activeString) {
-  return (dispatch, getState) => {
-    const { config } = getState();
-    const newLayers = resetLayersSelector(
-      config.defaults.startingLayers,
-      config.layers,
-    );
-    dispatch({
-      type: RESET_LAYERS,
-      activeString,
-      layers: newLayers,
-    });
-  };
-}
+import { getGranuleFootprints } from '../../map/granule/util';
 
 export function initSecondLayerGroup() {
   return {
@@ -51,14 +48,20 @@ export function initSecondLayerGroup() {
 export function activateLayersForEventCategory(category) {
   return (dispatch, getState) => {
     const state = getState();
+
+    const originalLayers = state.layers.active.layers;
     const newLayers = activateLayersForEventCategorySelector(state, category);
     const overlayGroups = getOverlayGroups(newLayers);
+
+    const newEventLayers = findEventLayers(originalLayers, newLayers);
     overlayGroups.forEach((group) => { group.collapsed = true; });
+
     dispatch({
       type: ADD_LAYERS_FOR_EVENT,
       activeString: state.compare.activeString,
       layers: newLayers,
       overlayGroups,
+      eventLayers: newEventLayers,
     });
   };
 }
@@ -106,7 +109,7 @@ export function toggleOverlayGroups() {
   };
 }
 
-export function addLayer(id, spec = {}) {
+export function addLayer(id) {
   googleTagManager.pushEvent({
     event: 'layer_added',
     layers: { id },
@@ -122,7 +125,7 @@ export function addLayer(id, spec = {}) {
     const overlays = getLayersSelector(state, { group: 'overlays' });
     const newLayers = addLayerSelector(
       id,
-      spec,
+      {},
       activeLayers,
       layers.layerConfig,
       overlays.length || 0,
@@ -165,9 +168,11 @@ export function reorderOverlayGroups(layers, overlayGroups) {
 
 export function removeLayer(id) {
   return (dispatch, getState) => {
-    const { compare } = getState();
+    const state = getState();
+    const { compare } = state;
     const { activeString } = compare;
-    const activeLayers = getActiveLayersSelector(getState());
+    const activeLayers = getActiveLayersSelector(state);
+    const granuleLayers = getActiveGranuleLayers(state);
     const index = lodashFindIndex(activeLayers, { id });
     if (index === -1) {
       return console.warn(`Invalid layer ID: ${id}`);
@@ -178,15 +183,18 @@ export function removeLayer(id) {
       activeString,
       layersToRemove: [def],
       layers: update(activeLayers, { $splice: [[index, 1]] }),
+      granuleLayers: update(granuleLayers, { $unset: [id] }),
     });
   };
 }
 
 export function removeGroup(ids) {
   return (dispatch, getState) => {
-    const { compare } = getState();
+    const state = getState();
+    const { compare } = state;
     const { activeString } = compare;
-    const activeLayers = getActiveLayersSelector(getState());
+    const activeLayers = getActiveLayersSelector(state);
+    const granuleLayers = getActiveGranuleLayers(state);
     const layersToRemove = activeLayers.filter((l) => ids.includes(l.id));
     const newLayers = activeLayers.filter((l) => !ids.includes(l.id));
 
@@ -195,6 +203,7 @@ export function removeGroup(ids) {
       activeString,
       layersToRemove,
       layers: newLayers,
+      granuleLayers: update(granuleLayers, { $unset: [ids] }),
     });
   };
 }
@@ -257,18 +266,6 @@ export function setOpacity(id, opacity) {
   };
 }
 
-export function clearGraticule() {
-  return (dispatch) => {
-    dispatch(toggleVisibility('Graticule', false));
-  };
-}
-
-export function refreshGraticule() {
-  return (dispatch) => {
-    dispatch(toggleVisibility('Graticule', true));
-  };
-}
-
 export function hideLayers(layers) {
   return (dispatch) => {
     layers.forEach((obj) => {
@@ -276,10 +273,164 @@ export function hideLayers(layers) {
     });
   };
 }
+
 export function showLayers(layers) {
   return (dispatch) => {
     layers.forEach((obj) => {
       dispatch(toggleVisibility(obj.id, true));
+    });
+  };
+}
+
+function updateGranuleLayerGeometry(layer, dates, granuleGeometry) {
+  return (dispatch, getState) => {
+    const { compare, layers } = getState();
+    const { activeString } = compare;
+    const { id, count } = layer.wv;
+    const layerDef = layers.layerConfig[id];
+    const granulePlatform = `${layerDef.subtitle}`;
+    const activeSatelliteInstrumentGroup = layers[activeString].granulePlatform;
+    const activeGeometry = layers.granuleFootprints;
+
+    // determine if active satellite instrument, then update global geometry,
+    // else use current global geometry
+    const newGranuleGeometry = activeSatelliteInstrumentGroup === granulePlatform
+      ? granuleGeometry
+      : activeGeometry;
+
+    dispatch({
+      type: UPDATE_GRANULE_LAYER_GEOMETRY,
+      id,
+      activeKey: activeString,
+      granuleFootprints: newGranuleGeometry,
+      dates,
+      count,
+    });
+  };
+}
+
+function addGranuleLayerDates(layer, granuleFootprints, granulePlatform) {
+  return (dispatch, getState) => {
+    const { compare: { activeString } } = getState();
+    const { id, granuleDates, count } = layer.wv;
+
+    dispatch({
+      type: ADD_GRANULE_LAYER_DATES,
+      id,
+      activeKey: activeString,
+      dates: granuleDates,
+      granuleFootprints,
+      granulePlatform,
+      count,
+    });
+  };
+}
+
+export function updateGranuleLayerState(layer) {
+  return (dispatch, getState) => {
+    const state = getState();
+    const {
+      id, def: { endDate, subtitle }, reorderedGranules, granuleDates,
+    } = layer.wv;
+
+    const mostRecentGranuleDate = granuleDates[0];
+    const isMostRecentDateOutOfRange = new Date(mostRecentGranuleDate) > new Date(endDate);
+    const updatedDates = isMostRecentDateOutOfRange ? [] : reorderedGranules || granuleDates;
+    const granuleFootprints = getGranuleFootprints(layer);
+    const existingLayer = getGranuleLayer(state, id);
+
+    if (existingLayer) {
+      dispatch(updateGranuleLayerGeometry(layer, updatedDates, granuleFootprints));
+    }
+    dispatch(addGranuleLayerDates(layer, granuleFootprints, `${subtitle}`));
+  };
+}
+
+export function updateGranuleLayerOptions(dates, def, count) {
+  return (dispatch, getState) => {
+    const state = getState();
+    const { activeString } = state.compare;
+
+    const granulePlatform = def.subtitle;
+    const activeGranuleLayers = getActiveGranuleLayers(state);
+    const platformLayers = getGranuleLayersOfActivePlatform(granulePlatform, activeGranuleLayers);
+
+    platformLayers.forEach((layer) => {
+      dispatch({
+        type: UPDATE_GRANULE_LAYER_OPTIONS,
+        id: layer,
+        activeKey: activeString,
+        dates,
+        count,
+      });
+    });
+  };
+}
+
+export function resetGranuleLayerDates(id) {
+  return (dispatch, getState) => {
+    const { compare } = getState();
+    const { activeString } = compare;
+    dispatch({
+      type: RESET_GRANULE_LAYER_OPTIONS,
+      id,
+      activeKey: activeString,
+    });
+  };
+}
+
+export function changeGranuleSatelliteInstrumentGroup(id, granulePlatform) {
+  return (dispatch, getState) => {
+    const { compare } = getState();
+    const { activeString } = compare;
+    const { geometry } = getGranuleLayer(getState(), id);
+
+    dispatch({
+      type: CHANGE_GRANULE_SATELLITE_INSTRUMENT_GROUP,
+      granulePlatform,
+      geometry,
+      activeKey: activeString,
+    });
+  };
+}
+
+export function updateCollection(collection) {
+  return {
+    type: UPDATE_COLLECTION,
+    payload: collection,
+  };
+}
+
+export function updateBandCombination(id, bandCombo, layerIndex, selectedPreset) {
+  return (dispatch, getState) => {
+    const state = getState();
+    const {
+      layers, compare, proj, config,
+    } = state;
+    const layerObj = layers.layerConfig[id];
+    const { groupOverlays } = layers[compare.activeString];
+    const activeLayers = getActiveLayersSelector(state);
+    const overlays = getLayersSelector(state, { group: 'overlays' });
+    const newLayers = addLayerSelector(
+      id,
+      {},
+      activeLayers,
+      layers.layerConfig,
+      overlays.length || 0,
+      proj.id,
+      groupOverlays,
+      bandCombo,
+      selectedPreset,
+    );
+    const projections = Object.keys(config.projections);
+    updateRecentLayers(layerObj, projections);
+
+    dispatch({
+      type: UPDATE_DDV_LAYER,
+      id,
+      activeString: compare.activeString,
+      layers: newLayers,
+      layerIndex,
     });
   };
 }

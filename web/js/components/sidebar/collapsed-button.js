@@ -12,22 +12,22 @@ class CollapsedButton extends PureComponent {
     } = this.props;
     const buttonId = 'accordion-toggler-button';
     const labelText = 'Expand sidebar';
+    const classes = `sidebar-expand ${isMobile ? 'mobile' : ''}`;
 
     return (
       <div
-        id="productsHoldertoggleButtonHolder"
-        className="toggleButtonHolder"
+        className={classes}
       >
         <a
           id={buttonId}
           aria-label={labelText}
-          className="accordionToggler dateHolder staticLayers"
           onClick={onclick}
+          className="sidebar-anchor"
         >
-          <UncontrolledTooltip placement="right" target={buttonId}>
+          <UncontrolledTooltip id="center-align-tooltip" placement="right" target={buttonId}>
             {labelText}
           </UncontrolledTooltip>
-          <FontAwesomeIcon icon="layer-group" />
+          <FontAwesomeIcon className="layer-icon" icon="layer-group" />
           {isMobile
             ? (
               <span className="layer-count mobile">
@@ -39,6 +39,7 @@ class CollapsedButton extends PureComponent {
                 {`${numberOfLayers.toString()} Layers`}
               </span>
             )}
+          {!isMobile && <FontAwesomeIcon className="expand-icon" icon="caret-down" />}
         </a>
       </div>
     );

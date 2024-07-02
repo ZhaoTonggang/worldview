@@ -1,8 +1,13 @@
+import { TextEncoder, TextDecoder } from 'util';
 import configureMockStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
-import fetchMock from 'fetch-mock';
+import { thunk } from 'redux-thunk';
+import fetchMock from 'fetch-mock-jest';
 import * as actions from './actions';
 import * as constants from './constants';
+
+// jsdom polyfills
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
 
 const middlewares = [thunk];
 const mockStore = configureMockStore(middlewares);
@@ -11,7 +16,7 @@ describe('Notification fetch action', () => {
   afterEach(() => {
     fetchMock.restore();
   });
-  test('triggers start and success action types', () => {
+  test('triggers start and success action types [notifications-actions-success]', () => {
     const loc = 'mock/';
     fetchMock.getOnce(loc, {
       body: constants.MOCK_RESPONSE,
@@ -30,12 +35,12 @@ describe('Notification fetch action', () => {
     ];
     const store = mockStore({ notifications: {} });
     return store
-      .dispatch(actions.requestNotifications(loc, 'application/json'))
+      .dispatch(actions.requestNotifications(loc))
       .then(() => {
         expect(store.getActions()).toEqual(expectedActions);
       });
   });
-  test(`creates ${constants.REQUEST_NOTIFICATIONS_FAILURE} Action`, () => {
+  test(`creates ${constants.REQUEST_NOTIFICATIONS_FAILURE} Action [notifications-actions-failure]`, () => {
     const loc = 'mock/';
     fetchMock.mock(loc, {
       throws: ERROR_MESSAGE,
@@ -49,15 +54,15 @@ describe('Notification fetch action', () => {
     ];
     const store = mockStore({ shortLink: {} });
     return store
-      .dispatch(actions.requestNotifications(loc, 'application/json'))
+      .dispatch(actions.requestNotifications(loc))
       .catch(() => {
         expect(store.getActions()).toEqual(expectedActions);
       });
   });
 });
-describe('Notification post-request actions', () => {
+describe('Notification post-request actions [notifications-actions-post-request]', () => {
   test(
-    `setNotication action returns ${
+    `setNotification action returns ${
       constants.SET_NOTIFICATIONS
     } action type with array`,
     () => {
@@ -73,7 +78,7 @@ describe('Notification post-request actions', () => {
   test(
     `notificationsSeen action returns ${
       constants.NOTIFICATIONS_SEEN
-    } action type`,
+    } action type [notifications-actions-seen]`,
     () => {
       const expectedAction = {
         type: constants.NOTIFICATIONS_SEEN,

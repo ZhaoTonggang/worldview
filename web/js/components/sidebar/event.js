@@ -1,30 +1,36 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import lodashFind from 'lodash/find';
-import googleTagManager from 'googleTagManager';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import googleTagManager from 'googleTagManager';
 import { getDefaultEventDate } from '../../modules/natural-events/util';
 import util from '../../util/util';
 import EventIcon from './event-icon';
+import { formatDisplayDate } from '../../modules/date/util';
+import MonospaceDate from '../util/monospace-date';
 
 function Event (props) {
   const {
+    defaultEventLayer,
     deselectEvent,
     event,
+    eventLayers,
+    highlightEvent,
     isSelected,
+    isHighlighted,
+    layers,
+    removeGroup,
     selectedDate,
     selectEvent,
     sources,
+    toggleGroupVisibility,
+    toggleVisibility,
+    unHighlightEvent,
   } = props;
-  const eventDate = util.parseDateUTC(event.geometry[0].date);
-  const weekday = util.giveWeekDay(eventDate);
-  const day = eventDate.getUTCDate();
-  const month = util.giveMonth(eventDate);
-  const year = eventDate.getUTCFullYear();
-  const dateString = `${weekday}, ${month} ${day}, ${year}`;
-  const itemClass = isSelected
-    ? 'item-selected selectorItem item'
-    : 'selectorItem item';
+  const dateString = formatDisplayDate(event.geometry[0].date);
+  const itemClass = isSelected || isHighlighted
+    ? 'item-selected event item'
+    : 'event item';
 
   const elRef = useRef();
   useLayoutEffect(() => {
@@ -37,14 +43,22 @@ function Event (props) {
   /**
    *
    * @param {String} date | Date of event clicked
-   * @param {Boolean} isSelected | Is this event already selected
-   * @param {Object} e | Event Object
    */
   function onEventSelect(date) {
     if (isSelected && (!date || date === selectedDate)) {
+      const layersToHide = [];
+      layers.forEach((layer) => {
+        if (layer.group === 'overlays' && layer.layergroup !== 'Reference') {
+          layersToHide.push(layer.id);
+        }
+      });
+      toggleGroupVisibility(layersToHide, false);
+      removeGroup(eventLayers);
+      toggleVisibility(defaultEventLayer, true);
       deselectEvent();
     } else {
       const selectedEventDate = date || getDefaultEventDate(event);
+      toggleVisibility(defaultEventLayer, false);
       selectEvent(event.id, selectedEventDate);
       googleTagManager.pushEvent({
         event: 'natural_event_selected',
@@ -53,6 +67,39 @@ function Event (props) {
         },
       });
     }
+  }
+
+  /**
+   *
+   * @param {Boolean} isHighlighting | Is the action to highlight
+   */
+  function onEventHighlight(isHighlighting) {
+    if (!isHighlighting) {
+      unHighlightEvent();
+    } else {
+      const selectedEventDate = getDefaultEventDate(event);
+      highlightEvent(event.id, selectedEventDate);
+    }
+  }
+
+  /**
+   *
+   * @param {Object} geometry | Geometry object containing magnitude data
+   * @returns Magnitude data output
+   */
+  function magnitudeOutput({ magnitudeUnit, magnitudeValue }) {
+    if (!magnitudeUnit || !magnitudeValue) return;
+    const formattedunit = magnitudeUnit === 'kts' ? ' kts' : ' NM';
+    return (
+      <p className="magnitude">
+        {formattedunit === ' NM' ? 'Surface Area: ' : 'Wind Speed: '}
+        {magnitudeValue.toLocaleString()}
+        {formattedunit}
+        {formattedunit === ' NM' && (
+          <sup>2</sup>
+        )}
+      </p>
+    );
   }
 
   /**
@@ -66,22 +113,30 @@ function Event (props) {
           style={!isSelected ? { display: 'none' } : { display: 'block' }}
         >
           {event.geometry.map((geometry, index) => {
-            const date = geometry.date.split('T')[0];
+            const date = util.toISOStringDate(geometry.date);
             return (
-              <li key={`${event.id}-${date}`} className="dates">
-                <a
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEventSelect(date);
-                  }}
-                  className={
-                    selectedDate === date
-                      ? 'date item-selected active'
-                      : 'date item-selected '
-                  }
-                >
-                  {date}
-                </a>
+              <li key={`${event.id}-${date}`} className="date">
+
+                {selectedDate === date ? (
+                  <span
+                    className="active"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {formatDisplayDate(date)}
+                  </span>
+                )
+                  : (
+                    <a
+                      className="'date item-selected"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventSelect(date);
+                      }}
+                    >
+                      {formatDisplayDate(date)}
+                    </a>
+                  )}
+                {magnitudeOutput(geometry)}
               </li>
             );
           })}
@@ -94,8 +149,6 @@ function Event (props) {
    * Return reference list for an event
    */
   function renderReferenceList() {
-    if (!isSelected) return;
-
     const references = Array.isArray(event.sources)
       ? event.sources
       : [event.sources];
@@ -135,26 +188,47 @@ function Event (props) {
         e.stopPropagation();
         onEventSelect();
       }}
+      onMouseEnter={(e) => {
+        onEventHighlight(true);
+      }}
+      onMouseLeave={(e) => {
+        onEventHighlight(false);
+      }}
     >
       <EventIcon id={`${event.id}-list`} category={event.categories[0].title} />
       <h4
         className="title"
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: `${event.title}<br />${dateString}` }}
-      />
-      <p className="subtitle">{renderReferenceList()}</p>
+      >
+        {event.title}
+        {' '}
+        <br />
+        {' '}
+        {!isSelected && (
+          <MonospaceDate date={dateString} />
+        )}
+      </h4>
+      {isSelected && (<p className="subtitle">{renderReferenceList()}</p>)}
       {renderDateLists()}
     </li>
   );
 }
 
 Event.propTypes = {
+  defaultEventLayer: PropTypes.string,
   deselectEvent: PropTypes.func,
   event: PropTypes.object,
+  eventLayers: PropTypes.array,
+  highlightEvent: PropTypes.func,
   isSelected: PropTypes.bool,
+  isHighlighted: PropTypes.bool,
+  layers: PropTypes.array,
+  removeGroup: PropTypes.func,
   selectedDate: PropTypes.string,
   selectEvent: PropTypes.func,
   sources: PropTypes.array,
+  toggleGroupVisibility: PropTypes.func,
+  toggleVisibility: PropTypes.func,
+  unHighlightEvent: PropTypes.func,
 };
 
 export default Event;

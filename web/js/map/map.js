@@ -8,6 +8,35 @@ export const CRS_WGS_84 = 'EPSG:4326';
 
 export const CRS_WGS_84_QUERY_EXTENT = [-180, -60, 180, 60];
 
+/**
+ * Determines if an exent object contains valid values.
+ *
+ * @method isExtentValid
+ * @static
+ *
+ * @param extent {OpenLayers.Bound} The extent to check.
+ *
+ * @return {boolean} False if any of the values is NaN, otherwise returns
+ * true.
+ */
+export function mapIsExtentValid(extent) {
+  if (lodashIsUndefined(extent)) {
+    return false;
+  }
+  let valid = true;
+  if (extent.toArray) {
+    extent = extent.toArray();
+  }
+  lodashEach(extent, (value) => {
+    // eslint-disable-next-line no-restricted-globals
+    if (isNaN(value)) {
+      valid = false;
+      return false;
+    }
+  });
+  return valid;
+}
+
 /*
  * Checks to see if an extents string is found. If it exist
  * then it is changed from a string to an array which is then
@@ -42,35 +71,6 @@ export function mapParser(state, errors) {
       state.v = extent;
     }
   }
-}
-
-/**
- * Determines if an exent object contains valid values.
- *
- * @method isExtentValid
- * @static
- *
- * @param extent {OpenLayers.Bound} The extent to check.
- *
- * @return {boolean} False if any of the values is NaN, otherwise returns
- * true.
- */
-export function mapIsExtentValid(extent) {
-  if (lodashIsUndefined(extent)) {
-    return false;
-  }
-  let valid = true;
-  if (extent.toArray) {
-    extent = extent.toArray();
-  }
-  lodashEach(extent, (value) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (isNaN(value)) {
-      valid = false;
-      return false;
-    }
-  });
-  return valid;
 }
 
 /**
@@ -185,7 +185,7 @@ export function mapIsPolygonValid(polygon, maxDistance) {
  * @static
  *
  * @param polygon {object} GeoJSON poylgon geometry Object
- *
+
  * @param adjustSign {number} a value of 1 or -1
  *
  * @return {obj} Adjusted GeoJSON poylgon geometry Object
@@ -225,7 +225,7 @@ export function mapAdjustAntiMeridian(polygon, adjustSign) {
  */
 export function mapDistance2D(p1, p2) {
   // eslint-disable-next-line no-restricted-properties
-  return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
+  return Math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2);
 }
 
 /**
@@ -292,19 +292,3 @@ export function mapToPolys(geom) {
   }
   return [geom];
 }
-
-/* FIXME OL3
-wv.map.mock = function() {
-
-    return {
-        setDay: function() {},
-        setOpacity: function() {},
-        setVisibility: function() {},
-        setZIndex: function() {},
-        dispose: function() {},
-        setLookup: function() {},
-        clearLookup: function() {}
-    };
-
-};
-*/
