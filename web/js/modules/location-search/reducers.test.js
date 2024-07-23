@@ -3,11 +3,9 @@ import {
   locationSearchState,
 } from './reducers';
 import {
-  CLEAR_MARKER,
   CLEAR_SUGGESTIONS,
   SET_MARKER,
   SET_SUGGESTION,
-  TOGGLE_DIALOG_VISIBLE,
   TOGGLE_REVERSE_GEOCODE,
   TOGGLE_SHOW_LOCATION_SEARCH,
 } from './constants';
@@ -22,10 +20,10 @@ const suggestion = [{
   magicKey: 'test1234=',
   text: 'New York, NY, USA',
 }];
-const coordinates = [72, 40];
+const coordinatesObject = { id: 1234, latitude: 72, longitude: 40 };
 
 describe('locationSearch', () => {
-  test('locationSearch should return the initial state', () => {
+  test('locationSearch should return the initial state [locationstate-reducer-initial-state]', () => {
     expect(locationSearchReducer(undefined, {})).toEqual(
       locationSearchState,
     );
@@ -33,7 +31,7 @@ describe('locationSearch', () => {
   test(
     `${TOGGLE_SHOW_LOCATION_SEARCH
     } shows Location Search isExpanded and `
-      + 'should return new state',
+      + 'should return new state [locationsearch-reducer-toggle]',
     () => {
       expect(
         locationSearchReducer(locationSearchState, {
@@ -49,7 +47,7 @@ describe('locationSearch', () => {
   test(
     `${TOGGLE_REVERSE_GEOCODE
     } toggles isCoordinateSearchActive to true and `
-      + 'should return new state',
+      + 'should return new state [locationsearch-reducer-reverse-geocode]',
     () => {
       expect(
         locationSearchReducer(locationSearchState, {
@@ -63,63 +61,28 @@ describe('locationSearch', () => {
     },
   );
   test(
-    `${TOGGLE_DIALOG_VISIBLE
-    } sets coordinate dialog visiblity and `
-      + 'should return new state',
-    () => {
-      expect(
-        locationSearchReducer(locationSearchState, {
-          type: TOGGLE_DIALOG_VISIBLE,
-          value: true,
-        }),
-      ).toEqual({
-        ...locationSearchState,
-        isCoordinatesDialogOpen: true,
-      });
-    },
-  );
-  test(
     `${SET_MARKER
     } updates coordinates, reverseGeocodeResults `
-    + 'and sets isCoordinateSearchActive to false and should return new state',
+    + 'and sets isCoordinateSearchActive to false and should return new state [locationsearch-reducer-set-marker]',
     () => {
       expect(
         locationSearchReducer(locationSearchState, {
           type: SET_MARKER,
-          coordinates,
+          coordinates: coordinatesObject,
           reverseGeocodeResults,
-          isCoordinatesDialogOpen: true,
         }),
       ).toEqual({
         ...locationSearchState,
         isCoordinateSearchActive: false,
-        coordinates,
+        coordinates: [coordinatesObject],
         reverseGeocodeResults,
-        isCoordinatesDialogOpen: true,
-      });
-    },
-  );
-  test(
-    `${CLEAR_MARKER
-    } resets cooridnates and geocode results`
-      + 'should return new state',
-    () => {
-      expect(
-        locationSearchReducer(locationSearchState, {
-          type: CLEAR_MARKER,
-        }),
-      ).toEqual({
-        ...locationSearchState,
-        coordinates: [],
-        reverseGeocodeResults: null,
-        isCoordinatesDialogOpen: false,
       });
     },
   );
   test(
     `${SET_SUGGESTION
     } updates suggestions with value and `
-      + 'should return new state',
+      + 'should return new state [locationsearch-reducer-set-suggestion]',
     () => {
       expect(
         locationSearchReducer(locationSearchState, {
@@ -135,7 +98,7 @@ describe('locationSearch', () => {
   test(
     `${CLEAR_SUGGESTIONS
     } updates suggestions and suggestedPlace with clear value and `
-      + 'should return new state',
+      + 'should return new state [locationsearch-reducer-clear-suggestion]',
     () => {
       expect(
         locationSearchReducer(locationSearchState, {

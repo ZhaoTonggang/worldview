@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Alert } from 'reactstrap';
-import { Portal } from 'react-portal';
+import { createPortal } from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 /*
@@ -19,6 +19,9 @@ export default class AlertUtil extends React.Component {
         props.onDismiss();
       }, props.timeout);
     }
+    this.state = {
+      isOpen: props.isOpen,
+    };
   }
 
   componentDidMount() {
@@ -31,16 +34,25 @@ export default class AlertUtil extends React.Component {
     }
   }
 
+  closeAlert() {
+    const { onDismiss } = this.props;
+    this.setState({ isOpen: false });
+    if (onDismiss) {
+      onDismiss();
+    }
+  }
+
   renderAlert() {
     const {
       id,
       title,
       message,
+      messageTitle,
       icon,
-      isOpen,
       onDismiss,
       onClick,
     } = this.props;
+    const { isOpen } = this.state;
 
     return (
       <Alert
@@ -52,18 +64,28 @@ export default class AlertUtil extends React.Component {
           className="alert-content"
           title={title}
           onClick={onClick}
+          style={{ paddingRight: !onDismiss ? 8 : 5 }}
         >
           <FontAwesomeIcon
             icon={icon || 'exclamation-triangle'}
             className="wv-alert-icon"
             size="1x"
           />
-          <div className="wv-alert-message">
-            {message}
+          <div className="alert-text">
+            <p className="wv-alert-title">
+              {messageTitle}
+            </p>
+            <em className="wv-alert-message">
+              <b>{message}</b>
+            </em>
           </div>
         </div>
         {onDismiss && (
-          <div id={`${id}-close`} className="close-alert" onClick={onDismiss}>
+          <div
+            id={`${id}-close`}
+            className="close-alert"
+            onClick={() => this.closeAlert()}
+          >
             <FontAwesomeIcon icon="times" className="exit" size="1x" />
           </div>
         )}
@@ -73,13 +95,11 @@ export default class AlertUtil extends React.Component {
 
   render() {
     const { noPortal } = this.props;
-    return noPortal
-      ? this.renderAlert()
-      : (
-        <Portal node={document && document.getElementById('wv-alert-container')}>
-          {this.renderAlert()}
-        </Portal>
-      );
+    const alertContainer = document.getElementById('wv-alert-container');
+    if (!noPortal && alertContainer) {
+      return createPortal(this.renderAlert(), document.getElementById('wv-alert-container'));
+    }
+    return this.renderAlert();
   }
 }
 
@@ -92,6 +112,7 @@ AlertUtil.propTypes = {
   id: PropTypes.string,
   isOpen: PropTypes.bool,
   message: PropTypes.string,
+  messageTitle: PropTypes.string,
   noPortal: PropTypes.bool,
   onClick: PropTypes.func,
   onDismiss: PropTypes.func,

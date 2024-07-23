@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import googleTagManager from 'googleTagManager';
 import Button from '../util/button';
 import Checkbox from '../util/checkbox';
 import safeLocalStorage from '../../util/local-storage';
+import { getConceptUrl } from '../../modules/smart-handoff/selectors';
 
 const STD_NRT_MAP = {
   STD: 'Standard',
@@ -17,17 +19,14 @@ const STD_NRT_MAP = {
  * layer data and granule files that are available for download.
  */
 function SmartHandoffModal({
-  displayDate, selectedLayer, selectedCollection, continueToEDS,
+  displayDate, selectedLayer, selectedCollection, continueToEDS, cmrSearchDetailURL,
 }) {
   // Hides Earthdata Search information by default
   const [showMoreInfo, toggleInfo] = useState(false);
   const { HIDE_EDS_WARNING } = safeLocalStorage.keys;
   const [hideModal, setHideModal] = useState(safeLocalStorage.getItem(HIDE_EDS_WARNING) || false);
-  const {
-    value, title, type, version,
-  } = selectedCollection;
+  const { title, type, version } = selectedCollection;
   const { dateRanges } = selectedLayer;
-  const cmrSearchDetailURL = `https://cmr.earthdata.nasa.gov/search/concepts/${value}.html`;
 
   const onCheck = () => {
     if (!hideModal) {
@@ -66,7 +65,7 @@ function SmartHandoffModal({
           <p>
             Earthdata Search provides the only means for data discovery, filtering, visualization, and
             access across all of NASA Earth science data holdings. The current selected layer and the designated
-            viewport region in Worldview will be used to derive data granules within Earthdata Search.
+            viewport region in @NAME@ will be used to derive data granules within Earthdata Search.
           </p>
 
           <img className="earth-data-gif" src="images/earth-data-search-preview.gif" />
@@ -87,9 +86,9 @@ function SmartHandoffModal({
           <h1 className="about-heading">Why must I register?</h1>
           <p>
             As noted on the Earthdata homepage, the Earthdata Login provides a single mechanism for user registration and profile
-            management for all EOSDIS system components (DAACs, Tools, Services). Your Earthdata login also helps the EOSDIS program
-            better understand the usage of EOSDIS services to improve user experience through customization of tools and improvement
-            of services. EOSDIS data are openly available to all and free of charge except where governed by international agreements.
+            management for all ESDIS system components (DAACs, Tools, Services). Your Earthdata Login also helps the ESDIS program
+            better understand the usage of ESDIS services to improve user experience through customization of tools and improvement
+            of services. ESDIS data are openly available to all and free of charge except where governed by international agreements.
           </p>
         </div>
       </div>
@@ -106,7 +105,7 @@ function SmartHandoffModal({
           {STD_NRT_MAP[type] + (version ? ` - v${version}` : '')}
           <br />
           <a href={cmrSearchDetailURL} target="_blank" rel="noopener noreferrer">
-            {`${title || 'Details'}`}
+            {title || 'Details'}
           </a>
         </div>
 
@@ -155,15 +154,20 @@ function SmartHandoffModal({
   );
 }
 
+function mapStateToProps(state, ownProps) {
+  const { selectedCollection: { value } } = ownProps;
+  const url = value && getConceptUrl(state)(value);
+  return {
+    cmrSearchDetailURL: url,
+  };
+}
 
-/**
- * Handle type-checking of defined properties
- */
 SmartHandoffModal.propTypes = {
   continueToEDS: PropTypes.func,
   displayDate: PropTypes.string,
+  cmrSearchDetailURL: PropTypes.string,
   selectedCollection: PropTypes.object,
   selectedLayer: PropTypes.object,
 };
 
-export default SmartHandoffModal;
+export default connect(mapStateToProps)(SmartHandoffModal);

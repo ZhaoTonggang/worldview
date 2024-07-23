@@ -12,6 +12,7 @@ import {
 import SelectedDate from '../../../selected-date';
 import { getSelectedDate } from '../../../../modules/date/selectors';
 import { getLayerNoticesForLayer } from '../../../../modules/notifications/util';
+import MonospaceDate from '../../../util/monospace-date';
 
 /*
  * A scrollable list of layers
@@ -62,6 +63,7 @@ function MeasurementLayerRow (props) {
         {layerNotices && (<FontAwesomeIcon icon="exclamation-triangle" id="notice-info" />)}
         {(layerNotices || layerIsUnavailable) && (
           <UncontrolledTooltip
+            id="center-align-tooltip"
             target={itemElementId}
             boundariesElement="window"
             className="zot-tooltip"
@@ -73,10 +75,10 @@ function MeasurementLayerRow (props) {
             {layerIsUnavailable && (
               <div>
                 This layer has no visible content on the selected date:
-                <br />
-                <span style={{ fontFamily: 'monospace' }}>
+                {' '}
+                <MonospaceDate>
                   <SelectedDate />
-                </span>
+                </MonospaceDate>
               </div>
             )}
             {layerNotices && (<div dangerouslySetInnerHTML={{ __html: layerNotices }} />)}
@@ -100,12 +102,12 @@ MeasurementLayerRow.propTypes = {
 };
 
 const mapStateToProps = (state, ownProps) => {
-  const { notifications, browser } = state;
+  const { notifications, screenSize } = state;
   const activeLayerMap = getActiveLayersMap(state);
   const { id } = ownProps.layer;
   return {
     isEnabled: !!activeLayerMap[id],
-    isMobile: browser.lessThan.medium,
+    isMobile: screenSize.isMobile,
     selectedDate: getSelectedDate(state),
     layerNotices: getLayerNoticesForLayer(id, notifications),
   };

@@ -49,25 +49,6 @@ export function emailUrlParams(subject, body) {
   );
 }
 
-export function getShareLink(type, url) {
-  const shareMessage = 'Check out what I found in NASA Worldview!';
-  const twMessage = 'Check out what I found in #NASAWorldview -';
-  const emailBody = `${shareMessage} - ${url}`;
-
-  switch (type) {
-    case 'twitter':
-      return twitterUrlParams(url, twMessage);
-    case 'facebook':
-      return facebookUrlParams('121285908450463', url, url, 'popup');
-    case 'reddit':
-      return redditUrlParams(url, shareMessage);
-    case 'email':
-      return emailUrlParams(shareMessage, emailBody);
-    default:
-      return undefined;
-  }
-}
-
 export function encode(value) {
   let encoded = encodeURIComponent(value);
   lodashEach(ENCODING_EXCEPTIONS, (exception) => {
@@ -105,7 +86,41 @@ export function getPermalink(queryString, selectedDate, isEmbed) {
     permalink = permalink.replace('em=true', 'em=false');
   }
 
+  // Remove 'kiosk=true'
+  if (permalink.includes('kiosk=true')) {
+    if (permalink.includes('?kiosk=true&')) {
+      permalink = permalink.replace('?kiosk=true&', '?');
+    } else if (permalink.includes('&kiosk=true')) {
+      permalink = permalink.replace('&kiosk=true', '');
+    } else if (permalink.includes('?kiosk=true')) {
+      permalink = permalink.replace('?kiosk=true', '');
+    }
+  }
+
+  // Remove 'e2e=true'
+  if (permalink.includes('e2e=true')) {
+    if (permalink.includes('?e2e=true&')) {
+      permalink = permalink.replace('?e2e=true&', '?');
+    } else if (permalink.includes('&e2e=true')) {
+      permalink = permalink.replace('&e2e=true', '');
+    } else if (permalink.includes('?e2e=true')) {
+      permalink = permalink.replace('?e2e=true', '');
+    }
+  }
+
+  // Check for 'eic=' and remove it along with the next two characters
+  const eicPattern = /eic=../g;
+  permalink = permalink.replace(eicPattern, '');
+
+  // Handle cases where removing `eic=..` might leave behind '&'
+  if (permalink.endsWith('&')) {
+    permalink = permalink.slice(0, -1);
+  } else if (permalink.includes('&&')) {
+    permalink = permalink.replace('&&', '&');
+  }
+
   return permalink;
 }
+
 
 export function wrapWithIframe(value) { return `<iframe src="${value}" role="application" sandbox="allow-modals allow-scripts allow-same-origin allow-forms allow-popups" width="100%" height="100%" allow="fullscreen; autoplay;" loading="lazy"></iframe>`; }

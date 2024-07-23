@@ -2,7 +2,7 @@ import {
   sortBy as lodashSortBy,
   indexOf as lodashIndexOf,
 } from 'lodash';
-import { createSelector } from 'reselect';
+import { createSelector } from '@reduxjs/toolkit';
 import buildLayerFacetProps from './format-config';
 import { getSelectedDate } from '../date/selectors';
 import util from '../../util/util';
@@ -18,7 +18,7 @@ export const getLayersForProjection = createSelector(
   (config, projection, selectedDate) => {
     const layersWithFacetProps = buildLayerFacetProps(config, selectedDate)
       // Only use the layers for the active projection
-      .filter((layer) => layer.projections[projection])
+      .filter((layer) => layer.projections && layer.projections[projection])
       .map((layer) => {
         // If there is metadata for the current projection, use that
         const projectionMeta = layer.projections[projection];
@@ -34,14 +34,23 @@ export const getLayersForProjection = createSelector(
   },
 );
 
-export const getMeasurementSource = createSelector(
-  [getConfig, getProductPicker],
-  (config, { selectedMeasurement, selectedMeasurementSourceIndex }) => {
+export const getSourcesForProjection = createSelector(
+  [getConfig, getProjection, getProductPicker],
+  (config, projection, { selectedMeasurement }) => {
     const measurements = Object.values(config.measurements);
     const currentMeasurement = measurements.find(({ id }) => id === selectedMeasurement);
     const sources = currentMeasurement && Object.values(currentMeasurement.sources);
-    const sortedSources = sources && sources.sort((a, b) => a.title.localeCompare(b.title));
-    return sortedSources && sortedSources[selectedMeasurementSourceIndex];
+    const trackGroup = currentMeasurement && currentMeasurement.id === 'orbital-track';
+    const sourcesForProj = sources && sources.filter(
+      (source) => source.settings.some((layerId) => {
+        if (!config.layers[layerId] || !config.layers[layerId].projections) return;
+        const { projections, layergroup } = config.layers[layerId];
+        const isOrbitTrack = layergroup === 'Orbital Track';
+        const inProj = !!projections[projection];
+        return trackGroup ? inProj : !isOrbitTrack && inProj;
+      }),
+    );
+    return sourcesForProj && sourcesForProj.sort((a, b) => a.title.localeCompare(b.title));
   },
 );
 

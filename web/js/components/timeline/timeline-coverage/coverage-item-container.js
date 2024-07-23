@@ -56,6 +56,7 @@ class CoverageItemContainer extends Component {
   */
   getDateRangeToDisplay = (dateRanges) => {
     const { getMaxEndDate, getDatesInDateRange, layer } = this.props;
+
     const multiDateToDisplay = dateRanges.reduce((multiCoverageDates, range, innerIndex) => {
       const { dateInterval, startDate, endDate } = range;
       const isLastInRange = innerIndex === dateRanges.length - 1;
@@ -71,16 +72,19 @@ class CoverageItemContainer extends Component {
       dateIntervalStartDates.forEach((dateIntStartDate) => {
         const dateIntTime = new Date(dateIntStartDate).getTime();
         // allow overwriting of subsequent date ranges
-        if (dateIntTime >= startDateTime && startDateTime <= endDateTime) {
+        if (dateIntTime >= startDateTime && dateIntTime < endDateTime) {
           const dateIntFormatted = dateIntStartDate.toISOString();
-          multiCoverageDates[dateIntFormatted] = { date: dateIntFormatted, interval: rangeInterval };
+          multiCoverageDates[dateIntFormatted] = {
+            date: dateIntFormatted,
+            interval: rangeInterval,
+          };
         }
       });
       return multiCoverageDates;
     }, {});
 
     return Object.values(multiDateToDisplay);
-  }
+  };
 
   /**
   * @desc updateDateRangeState
@@ -91,7 +95,7 @@ class CoverageItemContainer extends Component {
     this.setState({
       layerDateRanges: dateRange,
     });
-  }
+  };
 
   render() {
     const {
@@ -122,64 +126,61 @@ class CoverageItemContainer extends Component {
     } = getLayerItemStyles(visible, id);
 
     // get line container dimensions
-    const containerLineDimensions = getMatchingCoverageLineDimensions(layer);
+    const containerLineDimensions = getMatchingCoverageLineDimensions(layer).filter(({ visible }) => visible);
     return (
-      <>
-        <div
-          className="layer-coverage-line"
-          style={{
-            width: `${axisWidth}px`,
-          }}
+      <div
+        className="layer-coverage-line"
+        style={{
+          width: `${axisWidth}px`,
+        }}
+      >
+        <svg
+          className="layer-coverage-line-svg"
+          width={`${axisWidth}px`}
         >
-          <svg
-            className="layer-coverage-line-svg"
-            width={`${axisWidth}px`}
-          >
-            {needDateRangeBuilt
-              ? layerDateRanges.map((itemRange, multiIndex, array) => {
-                const { date, interval } = itemRange;
-                const dateObj = new Date(date);
-                const nextDate = array[multiIndex + 1];
-                const rangeDateEnd = getRangeDateEndWithAddedInterval(layer, dateObj, layerPeriod, interval, nextDate);
-                // get range line dimensions
-                const multiLineRangeOptions = getMatchingCoverageLineDimensions(layer, dateObj, rangeDateEnd);
-                // create DOM line element
-                const key = `${id}-${multiIndex}`;
-                return multiLineRangeOptions.visible
-                  && (
-                    <React.Fragment key={key}>
-                      <CoverageLine
-                        axisWidth={axisWidth}
-                        positionTransformX={positionTransformX}
-                        id={id}
-                        options={multiLineRangeOptions}
-                        lineType="MULTI"
-                        startDate={date}
-                        endDate={rangeDateEnd}
-                        color={lineBackgroundColor}
-                        layerPeriod={layerPeriod}
-                        index={key}
-                      />
-                    </React.Fragment>
-                  );
-              })
-              : containerLineDimensions.visible && (
-                <CoverageLine
-                  axisWidth={axisWidth}
-                  positionTransformX={positionTransformX}
-                  id={id}
-                  options={containerLineDimensions}
-                  lineType="SINGLE"
-                  startDate={startDate}
-                  endDate={endDate}
-                  color={lineBackgroundColor}
-                  layerPeriod={layerPeriod}
-                  index={`${id}-0`}
-                />
-              )}
-          </svg>
-        </div>
-      </>
+          {needDateRangeBuilt
+            ? layerDateRanges.map((itemRange, multiIndex, array) => {
+              const { date, interval } = itemRange;
+              const dateObj = new Date(date);
+              const nextDate = array[multiIndex + 1];
+              const rangeDateEnd = getRangeDateEndWithAddedInterval(layer, dateObj, layerPeriod, interval, nextDate);
+              // get range line dimensions
+              const multiLineRangeOptions = getMatchingCoverageLineDimensions(layer, dateObj, rangeDateEnd).filter(({ visible }) => visible);
+              // create DOM line element
+              const key = `${id}-${multiIndex}`;
+              return (
+                <React.Fragment key={key}>
+                  <CoverageLine
+                    axisWidth={axisWidth}
+                    positionTransformX={positionTransformX}
+                    id={id}
+                    options={multiLineRangeOptions}
+                    lineType="MULTI"
+                    startDate={date}
+                    endDate={rangeDateEnd}
+                    color={lineBackgroundColor}
+                    layerPeriod={layerPeriod}
+                    index={key}
+                  />
+                </React.Fragment>
+              );
+            })
+            : (
+              <CoverageLine
+                axisWidth={axisWidth}
+                positionTransformX={positionTransformX}
+                id={id}
+                options={containerLineDimensions}
+                lineType="SINGLE"
+                startDate={startDate}
+                endDate={endDate}
+                color={lineBackgroundColor}
+                layerPeriod={layerPeriod}
+                index={`${id}-0`}
+              />
+            )}
+        </svg>
+      </div>
     );
   }
 }

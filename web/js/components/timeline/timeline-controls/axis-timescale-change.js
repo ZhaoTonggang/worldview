@@ -2,7 +2,7 @@
 import React, { PureComponent } from 'react';
 import PropTypes from 'prop-types';
 import AxisTimeScaleChangeControls from './axis-timescale-change-controls';
-import { timeScaleToNumberKey } from '../../../modules/date/constants';
+import { TIME_SCALE_TO_NUMBER } from '../../../modules/date/constants';
 
 /*
  * Parent element for timeScale change controls and tooltip
@@ -31,7 +31,7 @@ class AxisTimeScaleChange extends PureComponent {
         toolTipHovered: true,
       });
     }
-  }
+  };
 
   // TimeScale select tooltip off
   toolTipHoverOff = () => {
@@ -39,7 +39,7 @@ class AxisTimeScaleChange extends PureComponent {
     this.setState({
       toolTipHovered: false,
     });
-  }
+  };
 
   // Toggle visibility of map scales
   disableMapScales = (disable) => {
@@ -49,7 +49,7 @@ class AxisTimeScaleChange extends PureComponent {
     for (const el of [...imperialMapScale, ...metricMapScale]) {
       el.style.opacity = opacity;
     }
-  }
+  };
 
   // ex: month(2) to day(3)
   incrementTimeScale = () => {
@@ -58,12 +58,12 @@ class AxisTimeScaleChange extends PureComponent {
       hasSubdailyLayers,
       timeScale,
     } = this.props;
-    const timeScaleNumber = timeScaleToNumberKey[timeScale];
+    const timeScaleNumber = TIME_SCALE_TO_NUMBER[timeScale];
     const maxTimeScaleNumber = hasSubdailyLayers ? 5 : 3;
     if (timeScaleNumber < maxTimeScaleNumber) {
       changeTimeScale(timeScaleNumber + 1);
     }
-  }
+  };
 
   // ex: day(3) to month(2)
   decrementTimeScale = () => {
@@ -71,11 +71,11 @@ class AxisTimeScaleChange extends PureComponent {
       changeTimeScale,
       timeScale,
     } = this.props;
-    const timeScaleNumber = timeScaleToNumberKey[timeScale];
+    const timeScaleNumber = TIME_SCALE_TO_NUMBER[timeScale];
     if (timeScaleNumber > 1) {
       changeTimeScale(timeScaleNumber - 1);
     }
-  }
+  };
 
   render() {
     const {

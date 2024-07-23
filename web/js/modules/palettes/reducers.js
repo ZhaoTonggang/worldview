@@ -12,20 +12,19 @@ import {
   SET_THRESHOLD_RANGE_AND_SQUASH,
   LOADED_CUSTOM_PALETTES,
   BULK_PALETTE_RENDERING_SUCCESS,
+  BULK_PALETTE_PRELOADING_SUCCESS,
   CLEAR_CUSTOM,
   SET_DISABLED_CLASSIFICATION,
 } from './constants';
 import { INIT_SECOND_LAYER_GROUP } from '../layers/constants';
-import util from '../../util/util';
 
-const { browser } = util;
 export const defaultPaletteState = {
   rendered: {},
   custom: {},
   active: {},
   activeB: {},
   isLoading: {},
-  supported: !(browser.ie || !browser.webWorkers || !browser.cors),
+  tourStoryPalettes: {},
 };
 export function getInitialPaletteState(config) {
   const rendered = lodashGet(config, 'palettes.rendered') || {};
@@ -48,6 +47,10 @@ export function paletteReducer(state = defaultPaletteState, action) {
     case BULK_PALETTE_RENDERING_SUCCESS:
       return update(state, {
         rendered: { $merge: action.rendered || {} },
+      });
+    case BULK_PALETTE_PRELOADING_SUCCESS:
+      return update(state, {
+        tourStoryPalettes: { $merge: action.tourStoryPalettes || {} },
       });
     case REQUEST_PALETTE_SUCCESS: {
       const isLoading = update(state.isLoading, { $unset: [action.id] });

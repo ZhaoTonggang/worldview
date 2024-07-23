@@ -1,4 +1,4 @@
-import { createSelector } from 'reselect';
+import { createSelector } from '@reduxjs/toolkit';
 import { validateGeometryCoords } from './util';
 
 const getActiveCategories = ({ events }) => events.selectedCategories;
@@ -21,7 +21,7 @@ const getProjection = ({ proj }) => proj.selected;
 export const getFilteredEvents = createSelector(
   [getActiveCategories, getEvents, getProjection],
   (activeCategories, events, proj) => {
-    if (!events) return;
+    if (!events) return [];
     return events
       .reduce((filteredEvents, event) => {
         const { geometry } = event;

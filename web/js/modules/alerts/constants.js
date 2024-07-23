@@ -1,10 +1,17 @@
 import EventsAlertModalBody from '../../components/events/alert-body';
 import CompareAlertModalBody from '../../components/compare/alert';
-import VectorAlertModalBody from '../../components/feature-alert/vector-alert-modal';
+import VectorZoomAlertModalBody from '../../components/feature-alert/vector-alert-modal';
+import GranuleAlertModalBody from '../../components/feature-alert/granuleAlertModal';
+import ZoomAlertModalBody from '../../components/feature-alert/zoomAlertModal';
 
-export const TOGGLE_VECTOR_ALERT = 'ALERTS/TOGGLE_VECTOR_ALERT';
-export const DISABLE_VECTOR_ALERT = 'ALERTS/DISABLE_VECTOR_ALERT';
-export const ACTIVATE_VECTOR_ALERT = 'ALERTS/ACTIVATE_VECTOR_ALERT';
+export const DISABLE_VECTOR_ZOOM_ALERT = 'ALERTS/DISABLE_VECTOR_ZOOM_ALERT';
+export const ACTIVATE_VECTOR_ZOOM_ALERT = 'ALERTS/ACTIVATE_VECTOR_ZOOM_ALERT';
+export const DISABLE_VECTOR_EXCEEDED_ALERT = 'ALERTS/DISABLE_VECTOR_EXCEEDED_ALERT';
+export const ACTIVATE_VECTOR_EXCEEDED_ALERT = 'ALERTS/ACTIVATE_VECTOR_EXCEEDED_ALERT';
+export const ACTIVATE_DDV_ZOOM_ALERT = 'ALERTS/ACTIVATE_DDV_ZOOM_ALERT';
+export const ACTIVATE_DDV_LOCATION_ALERT = 'ALERTS/ACTIVATE_DDV_LOCATION_ALERT';
+export const DEACTIVATE_DDV_ZOOM_ALERT = 'ALERTS/DEACTIVATE_DDV_ZOOM_ALERT';
+export const DEACTIVATE_DDV_LOCATION_ALERT = 'ALERTS/DEACTIVATE_DDV_LOCATION_ALERT';
 
 export const MODAL_PROPERTIES = {
   eventModalProps: {
@@ -36,7 +43,29 @@ export const MODAL_PROPERTIES = {
       backdrop: false,
       size: 'lg',
       clickableBehindModal: true,
-      bodyComponent: VectorAlertModalBody,
+      bodyComponent: VectorZoomAlertModalBody,
+      desktopOnly: true,
+    },
+  },
+  granuleModalProps: {
+    id: 'granule_layer_info',
+    props: {
+      headerText: 'Layer imagery is not visible at this location or date.',
+      backdrop: false,
+      size: 'lg',
+      clickableBehindModal: true,
+      bodyComponent: GranuleAlertModalBody,
+      desktopOnly: true,
+    },
+  },
+  zoomModalProps: {
+    id: 'zoom_layer_info',
+    props: {
+      headerText: 'Layer imagery is not visible at this zoom level.',
+      backdrop: false,
+      size: 'lg',
+      clickableBehindModal: true,
+      bodyComponent: ZoomAlertModalBody,
       desktopOnly: true,
     },
   },

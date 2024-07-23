@@ -1,5 +1,6 @@
 import { get } from 'lodash';
 import update from 'immutability-helper';
+
 // legacy crutches
 import {
   serializeDate,
@@ -23,6 +24,7 @@ import {
   parseEventFilterDates,
 } from './modules/natural-events/util';
 import { mapLocationToCompareState } from './modules/compare/util';
+import { mapLocationToChartingState } from './modules/charting/util';
 import {
   mapLocationToProjState,
   parseProjection,
@@ -33,12 +35,12 @@ import {
   serializeGroupOverlays,
   mapLocationToLayerState,
 } from './modules/layers/util';
-import { resetLayers, hasSubDaily, getActiveLayers } from './modules/layers/selectors';
+import { resetLayers, subdailyLayersActive } from './modules/layers/selectors';
 import { getInitialEventsState } from './modules/natural-events/reducers';
 import { mapLocationToPaletteState } from './modules/palettes/util';
 import { mapLocationToEmbedState } from './modules/embed/util';
 import { mapLocationToAnimationState } from './modules/animation/util';
-import { areCoordinatesWithinExtent, mapLocationToLocationSearchState } from './modules/location-search/util';
+import { mapLocationToLocationSearchState, serializeCoordinatesWrapper } from './modules/location-search/util';
 import mapLocationToSidebarState from './modules/sidebar/util';
 import util from './util/util';
 import {
@@ -81,6 +83,10 @@ export const mapLocationToState = (state, location) => {
       state,
     );
     stateFromLocation = mapLocationToCompareState(
+      parameters,
+      stateFromLocation,
+    );
+    stateFromLocation = mapLocationToChartingState(
       parameters,
       stateFromLocation,
     );
@@ -145,7 +151,7 @@ const getParameters = function(config, parameters) {
   const now = config.pageLoadTime;
   const nowMinusSevenDays = util.dateAdd(config.pageLoadTime, 'day', -7);
   const { initialDate } = config;
-  const startingLayers = resetLayers(config.defaults.startingLayers, config.layers);
+  const startingLayers = resetLayers(config);
   const eventsReducerState = getInitialEventsState(config);
   return {
     p: {
@@ -177,8 +183,7 @@ const getParameters = function(config, parameters) {
           let zoom = currentItemState;
           // check if subdaily timescale zoom to determine if reset is needed
           if (zoom > 3) {
-            const hasSubdailyLayers = hasSubDaily(getActiveLayers(state));
-            if (!hasSubdailyLayers) {
+            if (!subdailyLayersActive(state)) {
               zoom = 3; // reset to day
             }
           }
@@ -196,8 +201,7 @@ const getParameters = function(config, parameters) {
           let interval = currentItemState;
           // check if subdaily timescale zoom to determine if reset is needed
           if (interval > 3) {
-            const hasSubdailyLayers = hasSubDaily(getActiveLayers(state));
-            if (!hasSubdailyLayers) {
+            if (!subdailyLayersActive(state)) {
               interval = 3; // reset to day
             }
           }
@@ -233,8 +237,7 @@ const getParameters = function(config, parameters) {
           let customInterval = currentItemState;
           // check if subdaily customInterval to determine if reset is needed
           if (customInterval > 3) {
-            const hasSubdailyLayers = hasSubDaily(getActiveLayers(state));
-            if (!hasSubdailyLayers) {
+            if (!subdailyLayersActive(state)) {
               customInterval = 3; // reset to day
             }
           }
@@ -298,6 +301,38 @@ const getParameters = function(config, parameters) {
         },
       },
     },
+    kiosk: {
+      stateKey: 'ui.isKioskModeActive',
+      initialState: false,
+      type: 'bool',
+      options: {
+        serializeNeedsGlobalState: true,
+        serialize: (boo, state) => {
+          const isKioskModeActive = get(state, 'ui.isKioskModeActive');
+          return isKioskModeActive ? boo : undefined;
+        },
+      },
+    },
+    eic: {
+      stateKey: 'ui.eic',
+      initialState: '',
+    },
+    e2e: {
+      stateKey: 'ui.isE2eModeActive',
+      initialState: false,
+      type: 'bool',
+      options: {
+        serializeNeedsGlobalState: true,
+        serialize: (boo, state) => {
+          const isE2eModeActive = get(state, 'ui.isE2eModeActive');
+          return isE2eModeActive ? boo : undefined;
+        },
+      },
+    },
+    scenario: {
+      stateKey: 'ui.scenario',
+      initialState: '',
+    },
     em: {
       stateKey: 'embed.isEmbedModeActive',
       initialState: false,
@@ -324,6 +359,19 @@ const getParameters = function(config, parameters) {
         serialize: (showAll, state) => {
           const eventsActive = get(state, 'events.active');
           return eventsActive ? showAll : undefined;
+        },
+        setAsEmptyItem: true,
+      },
+    },
+    efa: {
+      stateKey: 'events.showAllTracks',
+      initialState: false,
+      type: 'bool',
+      options: {
+        serializeNeedsGlobalState: true,
+        serialize: (showAllTracks, state) => {
+          const eventsActive = get(state, 'events.active');
+          return eventsActive ? showAllTracks : undefined;
         },
         setAsEmptyItem: true,
       },
@@ -470,6 +518,22 @@ const getParameters = function(config, parameters) {
         parse: (str) => str === 'on',
       },
     },
+    aa: {
+      stateKey: 'animation.autoplay',
+      initialState: false,
+      options: {
+        serialize: (boo) => (boo ? 'true' : undefined),
+        parse: (str) => str === 'true',
+      },
+    },
+    abt: {
+      stateKey: 'modalAbout.isOpen',
+      initialState: false,
+      options: {
+        serialize: (boo) => (boo ? 'on' : undefined),
+        parse: (str) => str === 'on',
+      },
+    },
     sh: {
       stateKey: 'smartHandoffs',
       initialState: '',
@@ -484,20 +548,11 @@ const getParameters = function(config, parameters) {
     s: {
       stateKey: 'locationSearch.coordinates',
       initialState: [],
-      type: 'string',
+      type: 'array',
       options: {
         serializeNeedsGlobalState: true,
         parse: (coordinates) => coordinates,
-        serialize: (coordinates, state) => {
-          const { map, proj } = state;
-          if (map.ui.selected) {
-            const coordinatesWithinExtent = areCoordinatesWithinExtent(proj, coordinates);
-            if (!coordinatesWithinExtent) {
-              return;
-            }
-          }
-          return coordinates;
-        },
+        serialize: serializeCoordinatesWrapper,
       },
     },
     t: {
@@ -523,6 +578,10 @@ const getParameters = function(config, parameters) {
         serialize: serializeDateBWrapper,
         parse: (str) => parsePermalinkDate(nowMinusSevenDays, str, parameters.l1, config),
       },
+    },
+    travel: {
+      stateKey: 'ui.travelMode',
+      initialState: '',
     },
   };
 };

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { connect } from 'react-redux';
 import { Draggable, Droppable, DragDropContext } from 'react-beautiful-dnd';
 import PropTypes from 'prop-types';
+import { isMobileOnly, isTablet } from 'react-device-detect';
 import LayerList from './layer-list';
 import {
   getAllActiveOverlaysBaselayers,
@@ -17,6 +18,9 @@ import {
 } from '../../modules/layers/actions';
 import Checkbox from '../../components/util/checkbox';
 import util from '../../util/util';
+import SearchUiProvider from '../../components/layer/product-picker/search-ui-provider';
+import { openCustomContent } from '../../modules/modal/actions';
+import { stop as stopAnimationAction } from '../../modules/animation/actions';
 
 function LayersContainer (props) {
   const {
@@ -26,9 +30,8 @@ function LayersContainer (props) {
     groupOverlays,
     height,
     isActive,
-    isCompareActive,
     isEmbedModeActive,
-    isMobile,
+    isAnimating,
     overlayGroups,
     overlays,
     reorderOverlayGroups,
@@ -66,7 +69,7 @@ function LayersContainer (props) {
         key={groupName}
         draggableId={groupName}
         index={idx}
-        isDragDisabled={isEmbedModeActive}
+        isDragDisabled={isEmbedModeActive || isAnimating}
       >
         {(provided) => (
           <li
@@ -110,11 +113,8 @@ function LayersContainer (props) {
     </DragDropContext>
   );
 
-  const mobileHeightCoeff = isCompareActive ? -30 : 20;
   let minHeight = '100px';
-  let maxHeight = isMobile
-    ? height + mobileHeightCoeff
-    : height;
+  let maxHeight = height;
 
   if (isEmbedModeActive) {
     minHeight = '25px';
@@ -130,7 +130,6 @@ function LayersContainer (props) {
   };
   const shouldHideForEmbedNoOverlays = isEmbedModeActive && overlays.length === 0;
   const shouldHideForEmbedNoBaseLayers = isEmbedModeActive && baselayers.length === 0;
-
   return isActive && (
     <>
       <div id="layers-scroll-container" style={scrollContainerStyles}>
@@ -163,14 +162,18 @@ function LayersContainer (props) {
           )}
         </div>
       </div>
-      <div className="group-overlays-checkbox">
-        <Checkbox
-          id="group-overlays-checkbox"
-          checked={groupOverlays}
-          onCheck={toggleOverlayGroups}
-          label="Group Similar Layers"
-        />
-      </div>
+      { !isEmbedModeActive && (
+        <div className="product-buttons">
+          <div className="layers-add-container">
+            <Checkbox
+              id="group-overlays-checkbox"
+              checked={groupOverlays}
+              onCheck={toggleOverlayGroups}
+              label="Group Similar Layers"
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -178,11 +181,12 @@ function LayersContainer (props) {
 const mapStateToProps = (state, ownProps) => {
   const { compareState } = ownProps;
   const {
-    browser, compare, embed, layers,
+    compare, charting, embed, layers, animation, screenSize,
   } = state;
   const isCompareActive = compare.active;
+  const isChartingActive = charting.active;
   const { isEmbedModeActive } = embed;
-  const isMobile = browser.lessThan.medium;
+  const isMobile = screenSize.isMobileDevice;
   const { groupOverlays } = layers[compareState];
   const activeLayersMap = getActiveLayersMap(state);
   let { baselayers, overlays } = getAllActiveOverlaysBaselayers(state);
@@ -195,7 +199,9 @@ const mapStateToProps = (state, ownProps) => {
   }
 
   return {
+    isAnimating: animation.isPlaying,
     isCompareActive,
+    isChartingActive,
     isEmbedModeActive,
     isMobile,
     baselayers,
@@ -218,6 +224,21 @@ const mapDispatchToProps = (dispatch) => ({
   toggleCollapse: (groupName, collapsed) => {
     dispatch(toggleGroupCollapsedAction(groupName, collapsed));
   },
+  addLayers: (isPlaying) => {
+    const modalClassName = isMobileOnly || isTablet ? 'custom-layer-dialog-mobile custom-layer-dialog light' : 'custom-layer-dialog light';
+    if (isPlaying) {
+      dispatch(stopAnimationAction());
+    }
+    dispatch(
+      openCustomContent('LAYER_PICKER_COMPONENT', {
+        headerText: null,
+        modalClassName,
+        backdrop: true,
+        CompletelyCustomModal: SearchUiProvider,
+        wrapClassName: '',
+      }),
+    );
+  },
 });
 
 export default connect(
@@ -232,7 +253,9 @@ LayersContainer.propTypes = {
   groupOverlays: PropTypes.bool,
   height: PropTypes.number,
   isActive: PropTypes.bool,
+  isAnimating: PropTypes.bool,
   isCompareActive: PropTypes.bool,
+  isChartingActive: PropTypes.bool,
   isEmbedModeActive: PropTypes.bool,
   isMobile: PropTypes.bool,
   overlayGroups: PropTypes.array,
@@ -240,4 +263,8 @@ LayersContainer.propTypes = {
   reorderOverlayGroups: PropTypes.func,
   toggleCollapse: PropTypes.func,
   toggleOverlayGroups: PropTypes.func,
+  breakpoints: PropTypes.object,
+  isPlaying: PropTypes.bool,
+  screenWidth: PropTypes.number,
+  addLayers: PropTypes.func,
 };

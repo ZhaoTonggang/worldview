@@ -5,17 +5,40 @@ import { UncontrolledTooltip } from 'reactstrap';
 import copy from 'copy-to-clipboard';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import CopyClipboardTooltip from './copy-tooltip';
+import { getFormattedCoordinates } from './util';
+import util from '../../util/util';
+import { LOCATION_SEARCH_COORDINATE_FORMAT } from '../../util/constants';
+
+const { events } = util;
 
 class CoordinatesDialog extends Component {
   constructor(props) {
     super(props);
+    const { coordinates } = this.props;
     this.state = {
       tooltipToggleTime: 0,
-      showTooltips: true,
+      showTooltips: false,
       isCopyToClipboardTooltipVisible: false,
+      formattedCoordinates: getFormattedCoordinates(coordinates),
     };
     this.copyToClipboard = this.copyToClipboard.bind(this);
   }
+
+  componentDidMount() {
+    setTimeout(() => {
+      this.setState({ showTooltips: true });
+    }, 200);
+    events.on(LOCATION_SEARCH_COORDINATE_FORMAT, this.updateCoordinateFormat);
+  }
+
+  componentWillUnmount() {
+    events.off(LOCATION_SEARCH_COORDINATE_FORMAT, this.updateCoordinateFormat);
+  }
+
+  updateCoordinateFormat = () => {
+    const { coordinates } = this.props;
+    this.setState({ formattedCoordinates: getFormattedCoordinates(coordinates) });
+  };
 
   copyToClipboard(coords) {
     const options = window.clipboardData ? {} : { format: 'text/plain' };
@@ -26,21 +49,24 @@ class CoordinatesDialog extends Component {
       });
 
       // Prevent keyboard overlay in iOS
-      setTimeout(() => {
-        document.getElementById('location-search-autocomplete').blur();
-      }, 50);
+      const searchElement = document.getElementById('location-search-autocomplete');
+      if (searchElement) {
+        setTimeout(() => {
+          searchElement.blur();
+        }, 50);
+      }
     };
     copy(coords, options);
   }
 
   // close dialog and remove map marker
-  clearCoordinates = () => {
-    const { clearCoordinates } = this.props;
+  removeMarker = () => {
+    const { removeMarker } = this.props;
     this.setState({
       showTooltips: false,
     });
-    clearCoordinates();
-  }
+    removeMarker();
+  };
 
   // minimize dialog (destroy component)
   minimizeDialog = () => {
@@ -49,23 +75,25 @@ class CoordinatesDialog extends Component {
       showTooltips: false,
     });
     removeCoordinatesDialog();
-  }
+  };
 
   clearCopyToClipboardTooltip = () => {
     this.setState({
       isCopyToClipboardTooltipVisible: false,
     });
-  }
+  };
 
   // render minimize and remove dialog button controls
   renderDialogButtonControls = () => {
     const {
-      isMobile,
+      isMobile, tooltipId,
     } = this.props;
     const { showTooltips } = this.state;
 
-    const closeButtonId = 'close-coordinates-tooltip';
-    const minimizeButtonId = 'minimize-coordinates-tooltip';
+    const closeButtonClassName = 'close-coordinates-tooltip';
+    const closeButtonId = `${closeButtonClassName}${tooltipId}`;
+    const minimizeButtonClassName = 'minimize-coordinates-tooltip';
+    const minimizeButtonId = `${minimizeButtonClassName}${tooltipId}`;
     const closeButtonLabelText = 'Remove map marker';
     const minimizeButtonLabelText = 'Minimize coordinates tooltip';
 
@@ -74,12 +102,13 @@ class CoordinatesDialog extends Component {
       <>
         <span
           id={closeButtonId}
-          className={`close-tooltip ${closeButtonId}`}
-          onTouchEnd={this.clearCoordinates}
+          className={`close-tooltip ${closeButtonClassName}`}
+          onTouchEnd={this.removeMarker}
         >
           {tooltipVisibilityCondition
           && (
             <UncontrolledTooltip
+              id="center-align-tooltip"
               trigger="hover"
               target={closeButtonId}
               boundariesElement="window"
@@ -88,16 +117,17 @@ class CoordinatesDialog extends Component {
               {closeButtonLabelText}
             </UncontrolledTooltip>
           )}
-          <FontAwesomeIcon onClick={this.clearCoordinates} icon="times" fixedWidth />
+          <FontAwesomeIcon onClick={this.removeMarker} icon="times" fixedWidth />
         </span>
         <span
           id={minimizeButtonId}
-          className={`minimize-tooltip ${minimizeButtonId}`}
+          className={`minimize-tooltip ${minimizeButtonClassName}`}
           onTouchEnd={this.minimizeDialog}
         >
           {tooltipVisibilityCondition
           && (
             <UncontrolledTooltip
+              id="center-align-tooltip"
               trigger="hover"
               target={minimizeButtonId}
               boundariesElement="window"
@@ -110,26 +140,27 @@ class CoordinatesDialog extends Component {
         </span>
       </>
     );
-  }
+  };
 
   // render copy to clipboard button
   renderCopyToClipboardButton = () => {
-    const { coordinatesMetadata, isMobile } = this.props;
-    const { coordinates } = coordinatesMetadata;
-    const { isCopyToClipboardTooltipVisible, showTooltips } = this.state;
+    const { isMobile } = this.props;
+    const { isCopyToClipboardTooltipVisible, showTooltips, formattedCoordinates } = this.state;
 
     const buttonId = 'copy-coordinates-to-clipboard-button';
     const labelText = 'Copy coordinates to clipboard';
     const tooltipVisibilityCondition = !isMobile && !isCopyToClipboardTooltipVisible && showTooltips;
+
     return (
       <div
         id={buttonId}
         className={buttonId}
-        onClick={() => this.copyToClipboard(coordinates)}
-        onTouchEnd={() => this.copyToClipboard(coordinates)}
+        onClick={() => this.copyToClipboard(formattedCoordinates)}
+        onTouchEnd={() => this.copyToClipboard(formattedCoordinates)}
       >
         {tooltipVisibilityCondition && (
           <UncontrolledTooltip
+            id="center-align-tooltip"
             placement="bottom"
             trigger="hover"
             target={buttonId}
@@ -140,31 +171,30 @@ class CoordinatesDialog extends Component {
         <FontAwesomeIcon icon="copy" fixedWidth />
       </div>
     );
-  }
+  };
 
   render() {
     const {
-      coordinatesMetadata, tooltipId,
+      tooltipId,
+      title,
     } = this.props;
     const {
       showTooltips,
       tooltipToggleTime,
+      formattedCoordinates,
     } = this.state;
-    const {
-      coordinates,
-      title,
-    } = coordinatesMetadata;
 
     return (
       <div className={`tooltip-custom-black tooltip-static tooltip-coordinates-container ${tooltipId}`}>
         {showTooltips && (
-        <CopyClipboardTooltip
-          tooltipToggleTime={tooltipToggleTime}
-          clearCopyToClipboardTooltip={this.clearCopyToClipboardTooltip}
-        />
+          <CopyClipboardTooltip
+            tooltipToggleTime={tooltipToggleTime}
+            clearCopyToClipboardTooltip={this.clearCopyToClipboardTooltip}
+            placement="bottom"
+          />
         )}
         <div className="tooltip-coordinates-title">{title}</div>
-        <div className="tooltip-coordinates">{coordinates}</div>
+        <div className="tooltip-coordinates">{formattedCoordinates}</div>
         {this.renderDialogButtonControls()}
         {this.renderCopyToClipboardButton()}
       </div>
@@ -174,9 +204,10 @@ class CoordinatesDialog extends Component {
 
 export default CoordinatesDialog;
 CoordinatesDialog.propTypes = {
-  clearCoordinates: PropTypes.func,
+  removeMarker: PropTypes.func,
   removeCoordinatesDialog: PropTypes.func,
-  coordinatesMetadata: PropTypes.object,
+  title: PropTypes.string,
+  coordinates: PropTypes.array,
   isMobile: PropTypes.bool,
   tooltipId: PropTypes.string,
 };

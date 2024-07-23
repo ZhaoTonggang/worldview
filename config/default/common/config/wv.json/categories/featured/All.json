@@ -7,7 +7,12 @@
               "id": "featured-all",
               "description": "",
               "measurements": [
+                "TEMPO - Featured",
                 "Land Surface Reflectance - Featured",
+                "Surface Water Extent",
+                "Vegetation Disturbance Status",
+                "Aboveground Biomass",
+                "Land Surface Metrics - Featured",
                 "Geostationary",
                 "Fires and Thermal Anomalies - Featured",
                 "Flood",

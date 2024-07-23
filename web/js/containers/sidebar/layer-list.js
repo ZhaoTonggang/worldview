@@ -1,5 +1,5 @@
 /* eslint-disable react/jsx-props-no-spreading */
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { Droppable, DragDropContext } from 'react-beautiful-dnd';
@@ -18,12 +18,9 @@ import {
 } from '../../modules/layers/selectors';
 import {
   reorderLayers as reorderLayersAction,
-  removeLayer as removeLayerAction,
+  removeGroup as removeGroupAction,
   toggleGroupVisibility as toggleGroupVisibilityAction,
 } from '../../modules/layers/actions';
-import util from '../../util/util';
-
-const { events } = util;
 
 const reorder = (list, startIndex, endIndex) => {
   const result = Array.from(list);
@@ -34,37 +31,32 @@ const reorder = (list, startIndex, endIndex) => {
 
 function LayerList(props) {
   const {
+    activeLayers,
+    activeChartingLayer,
+    available,
     compareState,
     collapsed,
-    reorderLayers,
-    layerSplit,
-    activeLayers,
-    layers,
-    zots,
-    projId,
     getNames,
-    available,
     groupId,
+    isAnimating,
+    isMobile,
+    isChartingActive,
+    layerSplit,
+    layers,
+    numVisible,
+    projId,
+    reorderLayers,
     title,
-    removeLayers,
+    removeGroup,
     toggleVisibility,
     toggleCollapse,
-    isMobile,
-    numVisible,
+    zots,
   } = props;
   const { dragHandleProps = {} } = props;
   const groupLayerIds = layers.map(({ id }) => id);
   const layersInProj = layers.filter(({ projections }) => projections[projId]);
   const [showDropdownBtn, setDropdownBtnVisible] = useState(false);
   const [showDropdownMenu, setDropdownMenuVisible] = useState(false);
-  const [runningDataObj, setRunningDataObj] = useState({});
-
-  useEffect(() => {
-    events.on('map:running-data', setRunningDataObj);
-    return () => {
-      events.off('map:running-data', setRunningDataObj);
-    };
-  }, []);
 
   const toggleDropdownMenuVisible = () => {
     if (showDropdownMenu) {
@@ -115,6 +107,8 @@ function LayerList(props) {
       <LayerRow
         layer={layer}
         compareState={compareState}
+        isChartingActive={isChartingActive}
+        activeChartingLayer={activeChartingLayer}
         isInProjection={!!projections[projId]}
         key={id}
         index={index}
@@ -122,12 +116,11 @@ function LayerList(props) {
         names={getNames(id)}
         isDisabled={!available(id)}
         isVisible={visible}
-        runningObject={runningDataObj[id]}
       />
     );
   };
 
-  const renderDropdownMenu = () => (
+  const renderDropdownMenu = () => (!isAnimating && !isChartingActive) && (
     <Dropdown className="layer-group-more-options" isOpen={showDropdownMenu} toggle={toggleDropdownMenuVisible}>
       <DropdownToggle>
         <FontAwesomeIcon
@@ -142,7 +135,7 @@ function LayerList(props) {
         <DropdownItem id="hide-all" onClick={() => toggleVisibility(groupLayerIds, false)}>
           Hide All Layers
         </DropdownItem>
-        <DropdownItem id="remove-group" onClick={() => removeLayers(groupLayerIds)}>
+        <DropdownItem id="remove-group" onClick={() => removeGroup(groupLayerIds)}>
           Remove Group
         </DropdownItem>
       </DropdownMenu>
@@ -162,11 +155,13 @@ function LayerList(props) {
       </h3>
       <div className="layer-group-icons">
         {showDropdownBtn || isMobile ? renderDropdownMenu() : null}
-        <FontAwesomeIcon
-          className="layer-group-collapse"
-          icon={!collapsed ? 'caret-down' : 'caret-left'}
-          onClick={() => toggleCollapse(groupId, !collapsed)}
-        />
+        {!isChartingActive && (
+          <FontAwesomeIcon
+            className="layer-group-collapse"
+            icon={!collapsed ? 'caret-down' : 'caret-left'}
+            onClick={() => toggleCollapse(groupId, !collapsed)}
+          />
+        )}
       </div>
     </div>
   );
@@ -209,6 +204,7 @@ LayerList.propTypes = {
   dragHandleProps: PropTypes.object,
   getNames: PropTypes.func,
   groupId: PropTypes.string,
+  isAnimating: PropTypes.bool,
   isMobile: PropTypes.bool,
   isEmbedModeActive: PropTypes.bool,
   layers: PropTypes.array,
@@ -216,7 +212,6 @@ LayerList.propTypes = {
   numVisible: PropTypes.number,
   projId: PropTypes.string,
   reorderLayers: PropTypes.func,
-  removeLayers: PropTypes.func,
   toggleCollapse: PropTypes.func,
   toggleVisibility: PropTypes.func,
   title: PropTypes.string,
@@ -225,8 +220,10 @@ LayerList.propTypes = {
 
 const mapStateToProps = (state, ownProps) => {
   const {
-    embed, proj, config, map,
+    embed, proj, config, map, animation, screenSize, charting,
   } = state;
+  const isChartingActive = charting.active;
+  const activeChartingLayer = charting.activeLayer;
   const { isEmbedModeActive } = embed;
   const zots = lodashGet(map, 'ui.selected')
     ? getZotsForActiveLayers(state)
@@ -239,12 +236,15 @@ const mapStateToProps = (state, ownProps) => {
   return {
     zots,
     isEmbedModeActive,
-    isMobile: state.browser.lessThan.medium,
+    isMobile: screenSize.isMobileDevice,
     activeLayers,
     projId: proj.id,
     getNames: (layerId) => getTitles(config, layerId, proj.id),
     available: (layerId) => availableSelector(state)(layerId),
     numVisible,
+    isAnimating: animation.isPlaying,
+    isChartingActive,
+    activeChartingLayer,
   };
 };
 
@@ -252,10 +252,8 @@ const mapDispatchToProps = (dispatch) => ({
   reorderLayers: (newLayerArray) => {
     dispatch(reorderLayersAction(newLayerArray));
   },
-  removeLayers: (layerIds) => {
-    layerIds.forEach((id) => {
-      dispatch(removeLayerAction(id));
-    });
+  removeGroup: (layerIds) => {
+    dispatch(removeGroupAction(layerIds));
   },
   toggleVisibility: (layerIds, visible) => {
     dispatch(toggleGroupVisibilityAction(layerIds, visible));

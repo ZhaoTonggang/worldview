@@ -12,6 +12,9 @@ import {
   UPDATE_CROP_BOUNDS,
   TOGGLE_GIF,
   KEY_PRESS_ACTION,
+  COLLAPSE_ANIMATION,
+  TOGGLE_AUTOPLAY,
+  PLAY_KIOSK_ANIMATIONS,
 } from './constants';
 
 export const defaultState = {
@@ -23,6 +26,8 @@ export const defaultState = {
   startDate: undefined,
   endDate: undefined,
   boundaries: undefined,
+  isCollapsed: false,
+  autoplay: false,
 };
 export function getInitialState(config) {
   return {
@@ -98,6 +103,16 @@ export function animationReducer(state = defaultState, action) {
         gifActive: !state.gifActive,
         isPlaying: false,
       };
+    case COLLAPSE_ANIMATION:
+      return {
+        ...state,
+        isCollapsed: !state.isCollapsed,
+      };
+    case TOGGLE_AUTOPLAY:
+      return {
+        ...state,
+        autoplay: !state.autoplay,
+      };
     case KEY_PRESS_ACTION:
       if (action.keyCode === 32 && state.isActive) {
         return {
@@ -114,6 +129,15 @@ export function animationReducer(state = defaultState, action) {
         };
       }
       return state;
+    case PLAY_KIOSK_ANIMATIONS:
+      return {
+        ...state,
+        loop: true,
+        speed: 6,
+        startDate: action.startDate,
+        endDate: action.endDate,
+        isPlaying: true,
+      };
 
     default:
       return state;

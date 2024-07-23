@@ -4,7 +4,6 @@ import {
 } from 'lodash';
 import update from 'immutability-helper';
 import {
-  RESET_LAYERS,
   ADD_LAYER,
   INIT_SECOND_LAYER_GROUP,
   REORDER_LAYERS,
@@ -15,8 +14,14 @@ import {
   REMOVE_LAYER,
   UPDATE_OPACITY,
   ADD_LAYERS_FOR_EVENT,
+  ADD_GRANULE_LAYER_DATES,
+  UPDATE_GRANULE_LAYER_OPTIONS,
+  UPDATE_GRANULE_LAYER_GEOMETRY,
+  CHANGE_GRANULE_SATELLITE_INSTRUMENT_GROUP,
   REORDER_OVERLAY_GROUPS,
   REMOVE_GROUP,
+  UPDATE_DDV_LAYER,
+  UPDATE_COLLECTION,
 } from './constants';
 import {
   SET_CUSTOM as SET_CUSTOM_PALETTE,
@@ -40,23 +45,29 @@ const groupState = {
   layers: [],
   overlayGroups: [],
   prevLayers: [],
+  granuleFootprints: {},
+  granuleLayers: {},
+  granulePlatform: '',
 };
 
 export const initialState = {
   active: { ...groupState },
   activeB: { ...groupState },
+  collections: {},
   layerConfig: {},
   startingLayers: [],
+  granuleFootprints: {},
+  eventLayers: [],
 };
 
 export function getInitialState(config) {
   const { layers: layerConfig, defaults } = config;
-  const startingLayers = resetLayers(defaults.startingLayers, layerConfig);
+  const startingLayers = resetLayers(config);
   const groupsALocalStorage = safeLocalStorage.getItem(GROUP_OVERLAYS) !== 'disabled';
-  return {
+  const updatedState = {
     ...initialState,
     active: {
-      ...groupState,
+      ...initialState.active,
       groupOverlays: groupsALocalStorage,
       layers: startingLayers,
       overlayGroups: getOverlayGroups(startingLayers),
@@ -64,7 +75,9 @@ export function getInitialState(config) {
     layerConfig,
     startingLayers: defaults.startingLayers,
   };
+  return updatedState;
 }
+
 
 export function layerReducer(state = initialState, action) {
   const compareState = action.activeString;
@@ -79,17 +92,29 @@ export function layerReducer(state = initialState, action) {
   );
 
   switch (action.type) {
-    case RESET_LAYERS:
     case ADD_LAYER:
-    case REMOVE_LAYER:
-    case REMOVE_GROUP:
     case REORDER_LAYERS:
     case TOGGLE_OVERLAY_GROUP_VISIBILITY:
       return update(state, {
         [compareState]: {
-          layers: { $set: action.layers },
-          overlayGroups: { $set: getOverlayGroups(action.layers, getPrevOverlayGroups()) },
-          prevLayers: { $set: [] },
+          $merge: {
+            layers: action.layers,
+            overlayGroups: getOverlayGroups(action.layers, getPrevOverlayGroups()),
+            prevLayers: [],
+          },
+        },
+      });
+
+    case REMOVE_LAYER:
+    case REMOVE_GROUP:
+      return update(state, {
+        [compareState]: {
+          $merge: {
+            layers: action.layers,
+            overlayGroups: getOverlayGroups(action.layers, getPrevOverlayGroups()),
+            prevLayers: [],
+            granuleLayers: action.granuleLayers,
+          },
         },
       });
 
@@ -101,18 +126,20 @@ export function layerReducer(state = initialState, action) {
           overlayGroups: { $set: action.overlayGroups },
           prevLayers: { $set: [] },
         },
+        eventLayers: action.eventLayers === undefined ? { $push: [] } : action.eventLayers.length ? { $set: action.eventLayers } : { $push: [] },
       });
 
     case TOGGLE_OVERLAY_GROUPS:
-      return {
-        ...state,
+      return update(state, {
         [compareState]: {
-          groupOverlays: action.groupOverlays,
-          layers: action.layers,
-          overlayGroups: action.overlayGroups,
-          prevLayers: action.prevLayers,
+          $merge: {
+            groupOverlays: action.groupOverlays,
+            layers: action.layers,
+            overlayGroups: action.overlayGroups,
+            prevLayers: action.prevLayers,
+          },
         },
-      };
+      });
 
     case TOGGLE_COLLAPSE_OVERLAY_GROUP:
       return update(state, {
@@ -132,12 +159,13 @@ export function layerReducer(state = initialState, action) {
       };
 
     case TOGGLE_LAYER_VISIBILITY:
+      if (getLayerIndex() === -1) return state;
       return update(state, {
         [compareState]: {
           layers: {
             [getLayerIndex()]: {
               visible: {
-                $set: action.visible,
+                $set: action?.visible,
               },
             },
           },
@@ -145,12 +173,25 @@ export function layerReducer(state = initialState, action) {
         },
       });
 
-    case SET_THRESHOLD_RANGE_AND_SQUASH:
-    case SET_DISABLED_CLASSIFICATION: {
+    case UPDATE_OPACITY:
       return update(state, {
         [compareState]: {
           layers: {
             [getLayerIndex()]: {
+              opacity: { $set: action.opacity },
+            },
+          },
+        },
+      });
+
+    case SET_THRESHOLD_RANGE_AND_SQUASH:
+    case SET_DISABLED_CLASSIFICATION: {
+      const layerIndex = getLayerIndex();
+      if (layerIndex < 0) return state;
+      return update(state, {
+        [compareState]: {
+          layers: {
+            [layerIndex]: {
               $merge: action.props,
             },
           },
@@ -159,10 +200,12 @@ export function layerReducer(state = initialState, action) {
     }
 
     case CLEAR_CUSTOM_PALETTE: {
+      const layerIndex = getLayerIndex();
+      if (layerIndex < 0) { return state; }
       return update(state, {
         [compareState]: {
           layers: {
-            [getLayerIndex()]: {
+            [layerIndex]: {
               custom: {
                 $set: undefined,
               },
@@ -226,16 +269,141 @@ export function layerReducer(state = initialState, action) {
       });
     }
 
-    case UPDATE_OPACITY:
+    case ADD_GRANULE_LAYER_DATES: {
+      const {
+        id, activeKey, dates, granuleFootprints, granulePlatform, count,
+      } = action;
+
       return update(state, {
-        [compareState]: {
-          layers: {
-            [getLayerIndex()]: {
-              opacity: { $set: action.opacity },
+        [activeKey]: {
+          granuleLayers: {
+            $merge: {
+              [id]: {
+                dates,
+                count,
+                granuleFootprints,
+                granulePlatform,
+              },
+            },
+          },
+          granulePlatform: {
+            $set: granulePlatform,
+          },
+          granuleFootprints: {
+            $set: granuleFootprints,
+          },
+        },
+      });
+    }
+
+    case UPDATE_GRANULE_LAYER_OPTIONS: {
+      const {
+        id, activeKey, count, dates,
+      } = action;
+
+      return update(state, {
+        [activeKey]: {
+          granuleLayers: {
+            [id]: {
+              $merge: { count, dates },
             },
           },
         },
       });
+    }
+
+    case UPDATE_GRANULE_LAYER_GEOMETRY: {
+      const {
+        id, activeKey, dates, granuleFootprints, count,
+      } = action;
+
+      return update(state, {
+        [activeKey]: {
+          granuleLayers: {
+            [id]: {
+              $merge: {
+                dates,
+                granuleFootprints,
+                count,
+              },
+            },
+          },
+          granuleFootprints: {
+            $set: granuleFootprints,
+          },
+        },
+      });
+    }
+
+    case CHANGE_GRANULE_SATELLITE_INSTRUMENT_GROUP:
+      return update(state, {
+        [action.activeKey]: {
+          granulePlatform: {
+            $set: action.granulePlatform,
+          },
+          granuleFootprints: {
+            $set: action.geometry,
+          },
+        },
+      });
+
+    case UPDATE_COLLECTION: {
+      const updates = {};
+      action.payload.forEach((collection) => {
+        const {
+          id, date, type, version, projection,
+        } = collection;
+        // If the layer doesn't exist, initialize it
+        if (!state.collections[id]) {
+          updates[id] = {
+            $set: {
+              dates: [{
+                version,
+                type,
+                date,
+                projection,
+              }],
+            },
+          };
+        } else {
+          // If the layer exists, prepare to push to the dates array
+          const newEntry = {
+            date,
+            type,
+            version,
+            projection,
+          };
+          updates[id] = {
+            dates: { $push: [newEntry] },
+          };
+        }
+      });
+      return update(state, {
+        collections: {
+          $apply: (collections) => update(collections, updates),
+        },
+      });
+    }
+
+    // This is required because to update band combinations we need to actually remove and re-add these layers
+    // This case sets the ddv layer back to its original index before being removed and added again
+    case UPDATE_DDV_LAYER: {
+      const { layerIndex, id, layers } = action;
+      const indexToMove = layers.findIndex((activeLayer) => activeLayer.id === id);
+      const [layerToMove] = layers.splice(indexToMove, 1);
+      layers.splice(layerIndex, 0, layerToMove);
+
+      return update(state, {
+        [compareState]: {
+          $merge: {
+            layers,
+            overlayGroups: getOverlayGroups(layers, getPrevOverlayGroups()),
+            prevLayers: [],
+            layerIndex: action.layerIndex,
+          },
+        },
+      });
+    }
 
     default:
       return state;

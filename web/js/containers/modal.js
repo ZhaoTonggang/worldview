@@ -36,15 +36,16 @@ class ModalContainer extends Component {
     this.onResize = this.onResize.bind(this);
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps) {
     const {
       isCustom,
       id,
       isOpen,
       customProps,
       isMobile,
+      screenHeight,
+      screenWidth,
     } = this.props;
-    // Populate props from custom obj
     const newProps = isCustom && id ? update(this.props, { $merge: customProps }) : this.props;
     const {
       onToggle,
@@ -52,29 +53,53 @@ class ModalContainer extends Component {
       desktopOnly,
     } = newProps;
 
+    const screenHeightChanged = screenHeight !== prevProps.screenHeight;
+    const screenWidthChanged = screenWidth !== prevProps.screenWidth;
     const toggleFunction = toggleWithClose(onToggle, onClose, isOpen);
-    if (isMobile && isOpen && desktopOnly) {
-      toggleFunction();
+    if (isMobile && isOpen) {
+      if (desktopOnly) {
+        toggleFunction();
+      }
+      if (customProps.mobileFullScreen && (screenHeightChanged || screenWidthChanged)) {
+        const isPortrait = screenHeight > screenWidth;
+
+        // Values below match the request made in ol-vector-interactions
+        const sizeObj = {
+          width: isPortrait ? screenWidth : 445,
+          height: isPortrait ? screenHeight - 106 : 300,
+        };
+
+        this.onResize(null, { size: sizeObj });
+      }
     }
   }
 
   getStyle() {
     const {
+      isMobile, customProps,
+    } = this.props;
+    const {
       offsetLeft, offsetRight, offsetTop, width, height,
     } = this.state;
-
+    const { mobileFullScreen } = customProps;
+    const mobileTopOffset = 106;
+    const top = isMobile && mobileFullScreen ? mobileTopOffset : offsetTop;
+    const margin = isMobile ? 0 : '0.5rem auto';
     return {
       left: offsetLeft,
       right: offsetRight,
-      top: offsetTop,
+      top,
       width,
       height,
       maxHeight: height,
+      margin,
     };
   }
 
   onResize(e, { size }) {
-    e.stopPropagation();
+    if (e) {
+      e.stopPropagation();
+    }
     this.setState({
       width: size.width, height: size.height,
     });
@@ -97,13 +122,13 @@ class ModalContainer extends Component {
       customProps,
       id,
       isCustom,
+      isEmbedModeActive,
       isMobile,
       isOpen,
       isTemplateModal,
       screenHeight,
     } = this.props;
     const { width, height } = this.state;
-    // Populate props from custom obj
     const newProps = isCustom && id ? update(this.props, { $merge: customProps }) : this.props;
     const {
       autoFocus,
@@ -131,7 +156,9 @@ class ModalContainer extends Component {
       wrapClassName,
     } = newProps;
 
-    const isRestrictedDisplay = (isMobile && desktopOnly) || (!isMobile && mobileOnly);
+    const isRestrictedDisplay = (isMobile && desktopOnly)
+      || (!isMobile && mobileOnly)
+      || (isEmbedModeActive && size === 'lg' && !id.includes('LAYER_INFO_MODAL'));
     if (isRestrictedDisplay) {
       return null;
     }
@@ -141,7 +168,11 @@ class ModalContainer extends Component {
     const allowOuterClick = !isOpen || type === 'selection' || clickableBehindModal;
     const modalWrapClass = clickableBehindModal ? `clickable-behind-modal ${wrapClassName}` : wrapClassName;
     const toggleFunction = toggleWithClose(onToggle, onClose, isOpen);
-
+    const closeBtn = (
+      <button className="modal-close-btn" onClick={toggleFunction} type="button">
+        &times;
+      </button>
+    );
     return (
       <ErrorBoundary>
         <InteractionWrap
@@ -175,7 +206,6 @@ class ModalContainer extends Component {
             isOpen={isOpen}
             toggle={toggleFunction}
             backdrop={backdrop}
-            onExit={onClose}
             id={lowerCaseId}
             size={size}
             className={isTemplateModal ? 'template-modal' : modalClassName || 'default-modal'}
@@ -201,22 +231,21 @@ class ModalContainer extends Component {
                   disabled={allowOuterClick}
                 >
                   {(headerComponent || headerText) && (
-                    <ModalHeader toggle={toggleFunction}>
+                    <ModalHeader toggle={toggleFunction} close={closeBtn}>
                       {headerComponent ? <headerComponent /> : headerText || ''}
                     </ModalHeader>
                   )}
                   <ModalBody>
                     {bodyHeader && <h3>{bodyHeader}</h3>}
-                    {BodyComponent
-                      ? (
-                        <BodyComponent
-                          {...bodyComponentProps}
-                          parentId={id}
-                          screenHeight={screenHeight}
-                          closeModal={toggleFunction}
-                        />
-                      )
-                      : isTemplateModal ? this.getTemplateBody() : bodyText || ''}
+                    {BodyComponent ? (
+                      <BodyComponent
+                        {...bodyComponentProps}
+                        parentId={id}
+                        screenHeight={screenHeight}
+                        closeModal={toggleFunction}
+                      />
+                    )
+                      : isTemplateModal ? this.getTemplateBody() : (<p>{bodyText}</p>) || ''}
                   </ModalBody>
                   {footer && (<ModalFooter />)}
                 </DetectOuterClick>
@@ -229,6 +258,7 @@ class ModalContainer extends Component {
 }
 
 function mapStateToProps(state) {
+  const { embed, modal, screenSize } = state;
   const {
     bodyText,
     headerText,
@@ -237,27 +267,32 @@ function mapStateToProps(state) {
     isOpen,
     template,
     customProps,
-  } = state.modal;
+  } = modal;
   let bodyTemplate;
   let isTemplateModal = false;
   if (template) {
     bodyTemplate = state[template];
     isTemplateModal = true;
   }
-  const isMobile = state.browser.lessThan.medium;
-
+  const {
+    screenHeight, screenWidth, orientation, isMobileDevice,
+  } = screenSize;
+  const isMobile = isMobileDevice;
+  const { isEmbedModeActive } = embed;
   return {
-    isOpen,
-    bodyText,
-    headerText,
-    isCustom,
-    id,
-    isMobile,
-    screenHeight: isMobile ? undefined : state.browser.screenHeight,
-    screenWidth: isMobile ? undefined : state.browser.screenWidth,
     bodyTemplate,
-    isTemplateModal,
+    bodyText,
     customProps,
+    headerText,
+    id,
+    isCustom,
+    isEmbedModeActive,
+    isMobile,
+    isOpen,
+    isTemplateModal,
+    orientation,
+    screenHeight,
+    screenWidth,
   };
 }
 const mapDispatchToProps = (dispatch) => ({
@@ -270,17 +305,22 @@ export default connect(
   mapStateToProps,
   mapDispatchToProps,
 )(ModalContainer);
+
 ModalContainer.defaultProps = {
   customProps: {},
 };
+
 ModalContainer.propTypes = {
   bodyTemplate: PropTypes.object,
   customProps: PropTypes.object,
   id: PropTypes.string,
   isCustom: PropTypes.bool,
   isDraggable: PropTypes.bool,
+  isEmbedModeActive: PropTypes.bool,
   isMobile: PropTypes.bool,
   isOpen: PropTypes.bool,
   isTemplateModal: PropTypes.bool,
+  orientation: PropTypes.string,
   screenHeight: PropTypes.number,
+  screenWidth: PropTypes.number,
 };

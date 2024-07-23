@@ -126,7 +126,7 @@ const mockLayerDefsSubdaily = [
     layergroup: [
       'GOES',
     ],
-    inactive: true,
+    ongoing: false,
     visible: true,
     opacity: 1,
   },
@@ -171,7 +171,7 @@ const mockLayerDefsSubdaily = [
   },
 ];
 
-test('bboxWMS13', () => {
+test('bboxWMS13 [imagedownload-bbox]', () => {
   const coords = [[11, 22], [33, 44]];
   const bboxGeo = bboxWMS13(coords, 'EPSG:4326');
   expect(bboxGeo).toBe('22,11,44,33');
@@ -179,27 +179,27 @@ test('bboxWMS13', () => {
   expect(bboxArctic).toBe('11,22,33,44');
 });
 
-test('Default km resolution Calculation', () => {
+test('Default km resolution Calculation [imagedownload-default-resolution]', () => {
   const zoom = 5;
   const isGeo = true;
   expect(imageUtilCalculateResolution(zoom, isGeo, geoResolutions)).toBe('4');
 });
 
-test('Date time snapping when no subdaily layers present', () => {
+test('Date time snapping when no subdaily layers present [imagedownload-time-snap-no-subdaily]', () => {
   const mockDate = new Date('2019-09-15T18:32:40Z');
   const expectedTime = new Date('2019-09-15T00:00:00Z');
   const snappedDateTime = getLatestIntervalTime(mockLayerDefs, mockDate);
   expect(snappedDateTime.getTime()).toBe(expectedTime.getTime());
 });
 
-test('Date time snapping with subdaily layers present', () => {
+test('Date time snapping with subdaily layers present [imagedownload-time-snap-subdaily]', () => {
   const mockDate = new Date('2019-09-15T18:32:40Z');
   const expectedTime = new Date('2019-09-15T18:30:00Z');
   const snappedDateTime = getLatestIntervalTime(mockLayerDefsSubdaily, mockDate);
   expect(snappedDateTime.getTime()).toBe(expectedTime.getTime());
 });
 
-test('Download URL', () => {
+test('Download URL [imagedownload-url]', () => {
   const url = 'http://localhost:3002/api/v1/snapshot';
   const proj = {
     id: 'geographic',
@@ -214,8 +214,11 @@ test('Download URL', () => {
     height: 300,
   };
   const dateTime = new Date('2019-06-24T19:04:00Z');
-  const locationSearchCoordinates = [-19.1609, 2.7117];
-  const dlURL = getDownloadUrl(url, proj, mockLayerDefs, lonlats, dimensions, dateTime, false, false, locationSearchCoordinates);
+  const locationMarkers = [
+    { id: 1, longitude: 2.7117, latitude: -19.1609 },
+    { id: 2, longitude: 71.173, latitude: -39.0961 },
+  ];
+  const dlURL = getDownloadUrl(url, proj, mockLayerDefs, lonlats, dimensions, dateTime, false, false, locationMarkers);
   const expectedURL = 'http://localhost:3002/api/v1/snapshot'
     + '?REQUEST=GetSnapshot'
     + '&TIME=2019-06-24T00:00:00Z'
@@ -225,6 +228,6 @@ test('Download URL', () => {
     + '&WRAP=day'
     + '&FORMAT=image/jpeg'
     + '&WIDTH=300&HEIGHT=300'
-    + '&MARKER=-19.1609,2.7117';
+    + '&MARKER=2.7117,-19.1609,71.173,-39.0961';
   expect(dlURL.includes(expectedURL)).toBe(true);
 });

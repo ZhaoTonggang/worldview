@@ -22,8 +22,13 @@ class ModalInProgress extends React.Component {
       totalSteps,
       decreaseStep,
       incrementStep,
+      isKioskModeActive,
     } = this.props;
-
+    const closeBtn = (
+      <button className={isKioskModeActive ? 'd-none' : 'end-tour-close-btn'} onClick={endTour} type="button">
+        &times;
+      </button>
+    );
     return (
       <div>
         <Modal
@@ -36,7 +41,7 @@ class ModalInProgress extends React.Component {
           backdrop={false}
           keyboard={false}
         >
-          <ModalHeader toggle={endTour}>
+          <ModalHeader toggle={endTour} close={closeBtn} style={{ display: 'flex', alignItems: 'baseline' }}>
             {currentStory.title}
             <i className="modal-icon" aria-hidden="true" />
           </ModalHeader>
@@ -54,6 +59,7 @@ class ModalInProgress extends React.Component {
               totalSteps={totalSteps}
               decreaseStep={decreaseStep}
               incrementStep={incrementStep}
+              isKioskModeActive={isKioskModeActive}
             />
           </ModalFooter>
         </Modal>
@@ -67,6 +73,7 @@ ModalInProgress.propTypes = {
   currentStory: PropTypes.object.isRequired,
   decreaseStep: PropTypes.func.isRequired,
   endTour: PropTypes.func.isRequired,
+  isKioskModeActive: PropTypes.bool.isRequired,
   incrementStep: PropTypes.func.isRequired,
   modalInProgress: PropTypes.bool.isRequired,
   totalSteps: PropTypes.number.isRequired,

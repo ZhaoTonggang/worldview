@@ -10,9 +10,12 @@ import {
   UPDATE_END_DATE,
   UPDATE_CROP_BOUNDS,
   TOGGLE_GIF,
+  COLLAPSE_ANIMATION,
+  TOGGLE_AUTOPLAY,
+  PLAY_KIOSK_ANIMATIONS,
 } from './constants';
 import util from '../../util/util';
-import { timeScaleFromNumberKey } from '../date/constants';
+import { TIME_SCALE_FROM_NUMBER } from '../date/constants';
 import { getSelectedDate } from '../date/selectors';
 
 export function onActivate() {
@@ -24,8 +27,8 @@ export function onActivate() {
     const activeDate = getSelectedDate(getState());
     if (!animation.startDate || !animation.endDate) {
       const timeScaleChangeUnit = customSelected
-        ? timeScaleFromNumberKey[customInterval]
-        : timeScaleFromNumberKey[interval];
+        ? TIME_SCALE_FROM_NUMBER[customInterval]
+        : TIME_SCALE_FROM_NUMBER[interval];
       const deltaChangeAmt = customSelected ? customDelta : delta;
       const tenFrameDelta = 10 * deltaChangeAmt;
       const tenFramesBefore = util.dateAdd(activeDate, timeScaleChangeUnit, -tenFrameDelta);
@@ -99,5 +102,22 @@ export function changeCropBounds(bounds) {
 export function toggleComponentGifActive() {
   return {
     type: TOGGLE_GIF,
+  };
+}
+export function toggleAnimationCollapse() {
+  return {
+    type: COLLAPSE_ANIMATION,
+  };
+}
+export function toggleAnimationAutoplay() {
+  return {
+    type: TOGGLE_AUTOPLAY,
+  };
+}
+export function playKioskAnimation(startDate, endDate) {
+  return {
+    type: PLAY_KIOSK_ANIMATIONS,
+    startDate,
+    endDate,
   };
 }

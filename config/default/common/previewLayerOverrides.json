@@ -16,6 +16,9 @@
   "GOES-West_ABI_Band2_Red_Visible_1km": "2020-01-02T21:00:00Z",
   "GOES-West_ABI_Band13_Clean_Infrared": "2020-01-02T21:00:00Z",
 
+  "GMI_Precipitation_Rate_Asc": "2020-01-02T00:00:00Z",
+  "GMI_Precipitation_Rate_Dsc": "2020-01-02T00:00:00Z",
+
   "Himawari_AHI_Air_Mass": "2020-01-02T03:00:00Z",
   "Himawari_AHI_Band3_Red_Visible_1km": "2020-01-02T03:00:00Z",
   "Himawari_AHI_Band13_Clean_Infrared": "2020-01-02T03:00:00Z",
@@ -37,8 +40,6 @@
   "MODIS_Terra_L2_Photosynthetically_Available_Radiation": "2020-06-06T00:00:00Z",
   "MODIS_Terra_L2_Chlorophyll_A": "2020-06-06T00:00:00Z",
 
-  "MODIS_Combined_MAIAC_L3_IsotropicKernelParameters_8Day": "2019-12-19T00:00:00Z",
-
   "MOPITT_CO_Monthly_Surface_Mixing_Ratio_Day": "2019-02-01T00:00:00Z",
   "MOPITT_CO_Monthly_Surface_Mixing_Ratio_Night": "2019-02-01T00:00:00Z",
   "MOPITT_CO_Monthly_Total_Column_Day": "2019-02-01T00:00:00Z",
@@ -46,6 +47,9 @@
 
   "OrbitTracks_Landsat-8_Ascending": "2019-02-14T00:00:00Z",
   "OrbitTracks_Landsat-8_Descending": "2019-02-14T00:00:00Z",
+
+  "OrbitTracks_Landsat-9_Ascending": "2022-02-14T00:00:00Z",
+  "OrbitTracks_Landsat-9_Descending": "2022-02-14T00:00:00Z",
 
   "OrbitTracks_SMAP_Ascending": "2019-02-14T00:00:00Z",
   "OrbitTracks_SMAP_Descending": "2019-02-14T00:00:00Z",
@@ -69,7 +73,9 @@
   "SSMI_DMSP_F11_Wind_Speed_Over_Oceans_Descending": "2000-04-21T00:00:00Z",
   "VIIRS_NOAA20_Thermal_Anomalies_375m_All": "2020-01-29T00:00:00Z",
   "VIIRS_NOAA20_Thermal_Anomalies_375m_Day": "2020-01-29T00:00:00Z",
-  "VIIRS_NOAA20_Thermal_Anomalies_375m_Night": "2020-01-29T00:00:00Z"
+  "VIIRS_NOAA20_Thermal_Anomalies_375m_Night": "2020-01-29T00:00:00Z",
 
+  "AMSRE_Columnar_Water_Vapor_Night": "2009-08-01T00:00:00Z",
+  "AMSRE_Columnar_Water_Vapor_Day": "2009-08-01T00:00:00Z"
 
 }

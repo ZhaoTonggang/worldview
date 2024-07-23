@@ -1,5 +1,5 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import { connect } from 'react-redux';
 import PropTypes from 'prop-types';
 import lodashIsEmpty from 'lodash/isEmpty';
@@ -14,9 +14,14 @@ import OlGeomPolygon from 'ol/geom/Polygon';
 import * as olProj from 'ol/proj';
 import googleTagManager from 'googleTagManager';
 import EventIcon from '../../components/sidebar/event-icon';
-import { selectEvent as selectEventAction } from '../../modules/natural-events/actions';
+import {
+  selectEvent as selectEventAction,
+  highlightEvent as highlightEventAction,
+  unHighlightEvent as unHighlightEventAction,
+} from '../../modules/natural-events/actions';
 import { getDefaultEventDate } from '../../modules/natural-events/util';
 import { getFilteredEvents } from '../../modules/natural-events/selectors';
+import { CRS } from '../../modules/map/constants';
 
 const icons = [
   'Dust and Haze',
@@ -30,6 +35,59 @@ const icons = [
   'Water Color',
   'Wildfires',
 ];
+
+const createPin = function(id, category, isSelected, title, hideTooltip) {
+  const overlayEl = document.createElement('div');
+  const root = createRoot(overlayEl);
+  root.render(
+    React.createElement(EventIcon, {
+      category: category.title,
+      title,
+      id,
+      hideTooltip,
+      isSelected,
+    }),
+  );
+  return new OlOverlay({
+    element: overlayEl,
+    positioning: 'bottom-center',
+    stopEvent: false,
+    className: isSelected ? 'marker selected' : 'marker',
+    id,
+  });
+};
+
+const createBoundingBox = function(coordinates, title, proj = CRS.GEOGRAPHIC) {
+  const lightStroke = new OlStyleStyle({
+    stroke: new OlStyleStroke({
+      color: [255, 255, 255, 0.6],
+      width: 2,
+      lineDash: [8, 12],
+      lineDashOffset: 6,
+    }),
+  });
+  const darkStroke = new OlStyleStyle({
+    stroke: new OlStyleStroke({
+      color: [0, 0, 0, 0.6],
+      width: 2,
+      lineDash: [8, 12],
+    }),
+  });
+  const boxPolygon = new OlGeomPolygon(coordinates).transform(CRS.GEOGRAPHIC, proj);
+  const boxFeature = new OlFeature({
+    geometry: boxPolygon,
+    name: title,
+  });
+  const vectorSource = new OlSourceVector({
+    features: [boxFeature],
+    wrapX: false,
+  });
+
+  return new OlLayerVector({
+    source: vectorSource,
+    style: [lightStroke, darkStroke],
+  });
+};
 
 class EventMarkers extends React.Component {
   constructor(props) {
@@ -47,7 +105,7 @@ class EventMarkers extends React.Component {
     }
   }
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps) {
     const {
       proj, eventsDataIsLoading, isAnimatingToEvent, selectedEvent,
     } = this.props;
@@ -86,7 +144,7 @@ class EventMarkers extends React.Component {
 
       let { coordinates } = geometry;
 
-      const transformCoords = (coords) => olProj.transform(coords, 'EPSG:4326', crs);
+      const transformCoords = (coords) => olProj.transform(coords, CRS.GEOGRAPHIC, crs);
 
       // polar projections require transform of coordinates to crs
       if (proj.selected.id !== 'geographic') {
@@ -139,7 +197,9 @@ class EventMarkers extends React.Component {
   }
 
   addInteractions(marker, event, date, isSelected) {
-    const { selectEvent, mapUi } = this.props;
+    const {
+      selectEvent, highlightEvent, unHighlightEvent, mapUi,
+    } = this.props;
     const category = event.categories[0];
     let willSelect = true;
     let moveCount = 0;
@@ -168,6 +228,12 @@ class EventMarkers extends React.Component {
         });
       }
     };
+    const onMouseEnter = () => {
+      highlightEvent(event.id, date);
+    };
+    const onMouseLeave = () => {
+      unHighlightEvent();
+    };
 
     ['pointerdown', 'mousedown', 'touchstart'].forEach((type) => {
       pinEl.addEventListener(type, onMouseDownTouchStart, options);
@@ -178,6 +244,8 @@ class EventMarkers extends React.Component {
     ['pointermove', 'mousemove'].forEach((type) => {
       pinEl.addEventListener(type, onMouseMove, options);
     });
+    pinEl.addEventListener('mouseenter', onMouseEnter, options);
+    pinEl.addEventListener('mouseleave', onMouseLeave, options);
   }
 
   remove() {
@@ -196,6 +264,8 @@ class EventMarkers extends React.Component {
         map.removeOverlay(marker.pin);
       }
     });
+    const markerContainer = document.getElementById('marker-container');
+    markerContainer.remove();
     this.setState({ markers: [] });
   }
 
@@ -204,61 +274,9 @@ class EventMarkers extends React.Component {
   }
 }
 
-const createPin = function(id, category, isSelected, title, hideTooltip) {
-  const overlayEl = document.createElement('div');
-  ReactDOM.render(
-    React.createElement(EventIcon, {
-      category: category.title,
-      title,
-      id,
-      hideTooltip,
-    }),
-    overlayEl,
-  );
-  return new OlOverlay({
-    element: overlayEl,
-    positioning: 'bottom-center',
-    stopEvent: false,
-    className: isSelected ? 'marker selected' : 'marker',
-    id,
-  });
-};
-
-const createBoundingBox = function(coordinates, title, proj = 'EPSG:4326') {
-  const lightStroke = new OlStyleStyle({
-    stroke: new OlStyleStroke({
-      color: [255, 255, 255, 0.6],
-      width: 2,
-      lineDash: [8, 12],
-      lineDashOffset: 6,
-    }),
-  });
-  const darkStroke = new OlStyleStyle({
-    stroke: new OlStyleStroke({
-      color: [0, 0, 0, 0.6],
-      width: 2,
-      lineDash: [8, 12],
-    }),
-  });
-  const boxPolygon = new OlGeomPolygon(coordinates).transform('EPSG:4326', proj);
-  const boxFeature = new OlFeature({
-    geometry: boxPolygon,
-    name: title,
-  });
-  const vectorSource = new OlSourceVector({
-    features: [boxFeature],
-    wrapX: false,
-  });
-
-  return new OlLayerVector({
-    source: vectorSource,
-    style: [lightStroke, darkStroke],
-  });
-};
-
 const mapStateToProps = (state) => {
   const {
-    map, proj, events, requestedEvents, sidebar, date, browser,
+    map, proj, events, requestedEvents, sidebar, date, screenSize,
   } = state;
 
   return {
@@ -268,7 +286,7 @@ const mapStateToProps = (state) => {
     proj,
     selectedEvent: events.selected,
     selectedDate: date.selected,
-    isMobile: browser.lessThan.medium,
+    isMobile: screenSize.isMobileDevice,
     isAnimatingToEvent: events.isAnimatingToEvent,
     eventsData: getFilteredEvents(state),
     eventsDataIsLoading: requestedEvents.isLoading,
@@ -279,11 +297,18 @@ const mapDispatchToProps = (dispatch) => ({
   selectEvent: (id, date) => {
     dispatch(selectEventAction(id, date));
   },
+  highlightEvent: (id, date) => {
+    dispatch(highlightEventAction(id, date));
+  },
+  unHighlightEvent: () => {
+    dispatch(unHighlightEventAction());
+  },
 });
 
 EventMarkers.propTypes = {
   eventsData: PropTypes.array,
   eventsDataIsLoading: PropTypes.bool,
+  highlightEvent: PropTypes.func,
   isAnimatingToEvent: PropTypes.bool,
   isMobile: PropTypes.bool,
   map: PropTypes.object,
@@ -291,6 +316,7 @@ EventMarkers.propTypes = {
   proj: PropTypes.object,
   selectEvent: PropTypes.func,
   selectedEvent: PropTypes.object,
+  unHighlightEvent: PropTypes.func,
 };
 
 export default connect(

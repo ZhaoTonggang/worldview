@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import Joyride, { STATUS, ACTIONS, EVENTS } from 'react-joyride';
 import util from '../../util/util';
+import { JOYRIDE_INCREMENT } from '../../util/constants';
 
 const { events } = util;
 const placeholderElements = [];
@@ -50,6 +51,7 @@ export default function JoyrideWrapper ({
   const [elementPositionKey, setElementPositionKey] = useState(key);
   const [stepIndex, setStepIndex] = useState();
   const [run, setRun] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const incrementKey = () => {
     key += 1;
@@ -69,9 +71,9 @@ export default function JoyrideWrapper ({
     const incrementStep = () => {
       if (run && eventTriggersIncrement) setStepIndex(stepIndex + 1);
     };
-    events.on('joyride:increment', incrementStep);
+    events.on(JOYRIDE_INCREMENT, incrementStep);
     return () => {
-      events.off('joyride:increment', incrementStep);
+      events.off(JOYRIDE_INCREMENT, incrementStep);
     };
   });
 
@@ -143,6 +145,7 @@ export default function JoyrideWrapper ({
         setPlaceholderLocation(placeholderEl, targetCoordinates);
       }
     });
+    setIsInitializing(false);
     // Force a re-render so that Joyride updates the beacon location,
     // otherwise it doesn't know the DOM element position was updated
     incrementKey();
@@ -214,7 +217,7 @@ export default function JoyrideWrapper ({
     }
   });
 
-  return !projMatches ? null : (
+  return !projMatches || isInitializing ? null : (
     <Joyride
       run={run}
       stepIndex={stepIndex}

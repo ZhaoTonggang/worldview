@@ -8,39 +8,46 @@ import HoverTooltip from '../util/hover-tooltip';
 function Zoom({
   map, zoomLevel, numZoomLevels, isDistractionFreeModeActive, isMobile,
 }) {
+  const zoomInDisabled = zoomLevel === numZoomLevels;
+  const zoomOutDisabled = zoomLevel === 0;
   if (!map) return null;
 
+  const zoomButtonClass = isMobile ? 'wv-zoom-buttons-mobile' : 'wv-zoom-buttons';
+
   return !isDistractionFreeModeActive && (
-    <div className="wv-zoom-buttons">
+    <div className={zoomButtonClass}>
       <button
         type="button"
-        disabled={zoomLevel === numZoomLevels}
+        disabled={zoomInDisabled}
         className="wv-map-zoom wv-map-zoom-in"
         onClick={() => { mapUtilZoomAction(map, 1); }}
         onMouseMove={(e) => e.stopPropagation()}
       >
+        {!zoomInDisabled && (
         <HoverTooltip
           isMobile={isMobile}
           labelText="Zoom in view"
           placement="left"
           target=".wv-map-zoom-in"
         />
+        )}
         <FontAwesomeIcon icon="plus" />
       </button>
       <button
         type="button"
-        disabled={zoomLevel === 0}
+        disabled={zoomOutDisabled}
         className="wv-map-zoom wv-map-zoom-out"
-        title="Zoom out view."
         onClick={() => { mapUtilZoomAction(map, -1); }}
         onMouseMove={(e) => e.stopPropagation()}
       >
+        {!zoomOutDisabled && (
         <HoverTooltip
           isMobile={isMobile}
           labelText="Zoom out view"
           placement="left"
           target=".wv-map-zoom-out"
         />
+        )}
         <FontAwesomeIcon icon="minus" />
       </button>
     </div>
@@ -49,10 +56,10 @@ function Zoom({
 
 const mapStateToProps = (state) => {
   const {
-    browser, map, proj, ui,
+    screenSize, map, proj, ui,
   } = state;
   const activeMap = map.ui.selected;
-  const isMobile = browser.lessThan.medium;
+  const isMobile = screenSize.isMobileDevice;
   return {
     map: activeMap,
     zoomLevel: activeMap && activeMap.getView().getZoom(),

@@ -11,6 +11,7 @@
                     "Flood Hazard",
                     "Freeze/Thaw",
                     "Frozen Area",
+                    "Moisture Indices",
                     "Reservoirs",
                     "Sea Ice",
                     "Snow Cover",
@@ -18,7 +19,9 @@
                     "Snow Mass",
                     "Snow Water Equivalent",
                     "Soil Moisture",
-                    "Water Bodies"
+                    "Surface Water Extent",
+                    "Water Bodies",
+                    "Water Indices"
                 ]
             }
         }

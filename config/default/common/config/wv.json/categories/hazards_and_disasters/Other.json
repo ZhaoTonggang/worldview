@@ -11,11 +11,11 @@
                     "Blue Marble",
                     "Brightness Temperature",
                     "Cirrus Reflectance",
-                    "Chlorophyll A",
+                    "Chlorophyll a",
                     "Dams",
                     "Earth at Night",
-                    "Global Digital Elevation Map",
                     "Latitude-Longitude Lines",
+                    "Lidar",
                     "Orbital Track",
                     "Photosynthetically Available Radiation",
                     "Population Density",
@@ -25,6 +25,7 @@
                     "Reservoirs",
                     "Sea Surface Temperature",
                     "Settlements",
+                    "Terrain Elevation",
                     "Urban Extents",
                     "Water Bodies"
                 ]

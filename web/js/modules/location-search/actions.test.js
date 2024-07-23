@@ -1,15 +1,13 @@
 import configureMockStore from 'redux-mock-store';
-import thunk from 'redux-thunk';
+import { thunk } from 'redux-thunk';
 import {
   clearSuggestions,
-  toggleDialogVisible,
   toggleShowLocationSearch,
   toggleReverseGeocodeActive,
   setSuggestion,
 } from './actions';
 import {
   TOGGLE_REVERSE_GEOCODE,
-  TOGGLE_DIALOG_VISIBLE,
   TOGGLE_SHOW_LOCATION_SEARCH,
   CLEAR_SUGGESTIONS,
   SET_SUGGESTION,
@@ -28,7 +26,7 @@ const suggestion = [{
 
 describe('Location Search actions', () => {
   test(`toggleShowLocationSearch action returns ${TOGGLE_SHOW_LOCATION_SEARCH} as type and ${
-    !isExpanded} as value`, () => {
+    !isExpanded} as value [locationsearch-actions-toggle]`, () => {
     const expectedAction = {
       type: TOGGLE_SHOW_LOCATION_SEARCH,
       value: false,
@@ -42,28 +40,14 @@ describe('Location Search actions', () => {
     expect(store.getActions()[0]).toEqual(expectedAction);
   });
   test(`toggleReverseGeocodeActive action returns ${TOGGLE_REVERSE_GEOCODE} as type and ${
-    true} as value`, () => {
+    true} as value [locationsearch-actions-reverse-geocode]`, () => {
     const expectedAction = {
       type: TOGGLE_REVERSE_GEOCODE,
       value: true,
     };
     expect(toggleReverseGeocodeActive(true)).toEqual(expectedAction);
   });
-  test(`toggleDialogVisible action returns ${TOGGLE_DIALOG_VISIBLE} as type and ${
-    true} as value`, () => {
-    const expectedAction = {
-      type: TOGGLE_DIALOG_VISIBLE,
-      value: true,
-    };
-    const store = mockStore({
-      locationSearch: {
-        isCoordinatesDialogOpen: false,
-      },
-    });
-    store.dispatch(toggleDialogVisible(true));
-    expect(store.getActions()[0]).toEqual(expectedAction);
-  });
-  test(`setSuggestion action returns ${SET_SUGGESTION} as type and ${suggestion} as value`, () => {
+  test(`setSuggestion action returns ${SET_SUGGESTION} as type and ${suggestion} as value [locationsearch-actions-set-suggestion]`, () => {
     const expectedAction = {
       type: SET_SUGGESTION,
       value: suggestion,
@@ -76,7 +60,7 @@ describe('Location Search actions', () => {
     store.dispatch(setSuggestion(suggestion));
     expect(store.getActions()[0]).toEqual(expectedAction);
   });
-  test(`clearSuggestions action returns ${CLEAR_SUGGESTIONS} as type and ${[]} as value`, () => {
+  test(`clearSuggestions action returns ${CLEAR_SUGGESTIONS} as type and ${[]} as value [locationsearch-actions-clear-suggestions]`, () => {
     const expectedAction = {
       type: CLEAR_SUGGESTIONS,
       value: [],

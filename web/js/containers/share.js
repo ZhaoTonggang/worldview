@@ -1,22 +1,24 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import googleTagManager from 'googleTagManager';
 import copy from 'copy-to-clipboard';
 import {
   startCase as lodashStartCase,
 } from 'lodash';
 import {
-  InputGroupAddon,
   Input,
   InputGroup,
   Button,
   Nav, NavItem, NavLink,
   TabContent, TabPane,
 } from 'reactstrap';
-import ShareLinks from '../components/toolbar/share/links';
+import googleTagManager from 'googleTagManager';
 import ShareToolTips from '../components/toolbar/share/tooltips';
-import { getPermalink, getShareLink, wrapWithIframe } from '../modules/link/util';
+import {
+  getPermalink, wrapWithIframe,
+} from '../modules/link/util';
+import onClickFeedback from '../modules/feedback/util';
+import initFeedback from '../modules/feedback/actions';
 import { getSelectedDate } from '../modules/date/selectors';
 import Checkbox from '../components/util/checkbox';
 import HoverTooltip from '../components/util/hover-tooltip';
@@ -29,14 +31,15 @@ const getShortenRequestString = (mock, permalink) => {
     return 'mock/short_link.json';
   }
   return (
-    `service/link/shorten.cgi${
+    `service/link/shorten${
       mockStr
     }?url=${
       encodeURIComponent(permalink)}`
   );
 };
 
-const SOCIAL_SHARE_TABS = ['link', 'embed', 'social'];
+const DESKTOP_SHARE_TABS = ['link', 'embed', 'cite-us'];
+const MOBILE_SHARE_TABS = ['link', 'cite-us'];
 
 class ShareLinkContainer extends Component {
   constructor(props) {
@@ -68,6 +71,7 @@ class ShareLinkContainer extends Component {
     this.unlisten = history.listen((location, action) => {
       const newString = location.search;
       const { queryString } = this.state;
+      if (newString === undefined) { return; }
       if (queryString !== newString) {
         this.setState({
           queryString: newString,
@@ -76,6 +80,14 @@ class ShareLinkContainer extends Component {
         });
       }
     });
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (history.location.search !== prevState.queryString) {
+      this.setState({
+        queryString: history.location.search || '',
+      });
+    }
   }
 
   componentWillUnmount() {
@@ -87,7 +99,7 @@ class ShareLinkContainer extends Component {
     const link = this.getPermalink();
     const location = getShortenRequestString(mock, link);
     return requestShortLinkAction(location);
-  }
+  };
 
   onToggleShorten = () => {
     const { shortLinkKey, isShort, queryString } = this.state;
@@ -106,7 +118,7 @@ class ShareLinkContainer extends Component {
         isShort: !isShort,
       });
     }
-  }
+  };
 
   copyToClipboard = (url) => {
     const { activeTab } = this.state;
@@ -121,45 +133,27 @@ class ShareLinkContainer extends Component {
       });
     };
     copy(url, options);
-  }
+  };
 
   getPermalink = (isEmbed) => {
     const { queryString } = this.state;
     const { selectedDate } = this.props;
     return getPermalink(queryString, selectedDate, isEmbed);
-  }
-
-  onLinkClick = (type) => {
-    const permalink = this.getPermalink();
-    let shareLink = getShareLink(type, permalink);
-
-    googleTagManager.pushEvent({
-      event: 'share_social_platform',
-      social_type: type,
-    });
-
-    // If a short link can be generated, replace the full link.
-    if (type === 'twitter') {
-      const newTab = window.open('', '_blank');
-      this.getShortLink().then(({ link }) => {
-        shareLink = getShareLink(type, link);
-      }).finally(() => {
-        newTab.location = shareLink;
-      });
-    } else if (type === 'email') {
-      this.getShortLink().then(({ link }) => {
-        shareLink = getShareLink(type, link);
-      }).finally(() => {
-        window.location = shareLink;
-      });
-    } else {
-      window.open(shareLink, '_blank');
-    }
-  }
+  };
 
   setActiveTab = (activeTab) => {
     this.setState({ activeTab });
-  }
+  };
+
+  openFeedback = () => {
+    const {
+      isMobile,
+      feedbackIsInitiated,
+      feedbackEnabled,
+      sendFeedback,
+    } = this.props;
+    if (feedbackEnabled) sendFeedback(feedbackIsInitiated, isMobile);
+  };
 
   renderNavTabs = () => {
     const { embedDisableNavLink, isMobile } = this.props;
@@ -167,9 +161,10 @@ class ShareLinkContainer extends Component {
     const isDisabled = {
       embed: embedDisableNavLink,
     };
+    const shareTabs = isMobile ? MOBILE_SHARE_TABS : DESKTOP_SHARE_TABS;
     return (
       <Nav tabs>
-        {SOCIAL_SHARE_TABS.map((type) => {
+        {shareTabs.map((type) => {
           const navTitle = lodashStartCase(type);
           const navDisabledMessage = `${navTitle} is not available when the current application features are in use.`;
           const navTitleClass = `${type}-share-nav`;
@@ -195,7 +190,7 @@ class ShareLinkContainer extends Component {
         })}
       </Nav>
     );
-  }
+  };
 
   renderInputGroup = (value, type) => (
     <InputGroup>
@@ -208,20 +203,39 @@ class ShareLinkContainer extends Component {
           e.preventDefault();
         }}
       />
-      <InputGroupAddon addonType="append">
-        <Button
-          id={`copy-to-clipboard-button-${type}`}
-          onClick={() => this.copyToClipboard(value)}
-          onTouchEnd={() => this.copyToClipboard(value)}
-        >
-          COPY
-        </Button>
-      </InputGroupAddon>
+      <Button
+        id={`copy-to-clipboard-button-${type}`}
+        onClick={() => this.copyToClipboard(value)}
+        onTouchEnd={() => this.copyToClipboard(value)}
+      >
+        COPY
+      </Button>
     </InputGroup>
-  )
+  );
+
+  renderTextareaGroup = (value, type) => (
+    <InputGroup>
+      <textarea
+        value={value}
+        name={`permalink-content-${type}`}
+        id={`permalink-content-${type}`}
+        className="form-control"
+        onChange={(e) => {
+          e.preventDefault();
+        }}
+      />
+      <Button
+        id={`copy-to-clipboard-button-${type}`}
+        onClick={() => this.copyToClipboard(value)}
+        onTouchEnd={() => this.copyToClipboard(value)}
+      >
+        COPY
+      </Button>
+    </InputGroup>
+  );
 
   renderLinkTab = () => {
-    const { shortLink } = this.props;
+    const { shortLink, urlShortening } = this.props;
     const {
       activeTab,
       isShort,
@@ -234,6 +248,11 @@ class ShareLinkContainer extends Component {
         ? shortLink.response.link
         : this.getPermalink();
 
+    const url = window.location.href;
+    const preventShorten = url.length > 2048;
+    const isDisabled = shortLink.isLoading || preventShorten;
+    const tooltipText = isDisabled ? preventShorten ? 'URL has too many characters to shorten' : 'Link cannot be shortened at this time' : '';
+
     return (
       <TabPane tabId="link" className="share-tab-link">
         {activeTab === 'link' && (
@@ -243,18 +262,21 @@ class ShareLinkContainer extends Component {
               Copy URL to share link.
             </p>
             {' '}
-            <Checkbox
-              label="Shorten link"
-              id="wv-link-shorten"
-              onCheck={this.onToggleShorten}
-              checked={isShort}
-              disabled={!shortLink.isLoading}
-            />
+            {urlShortening && (
+              <Checkbox
+                label="Shorten link"
+                id="wv-link-shorten"
+                onCheck={!preventShorten ? this.onToggleShorten : null}
+                checked={isShort}
+                disabled={isDisabled}
+                title={tooltipText}
+              />
+            )}
           </>
         )}
       </TabPane>
     );
-  }
+  };
 
   renderEmbedTab = () => {
     const {
@@ -269,36 +291,41 @@ class ShareLinkContainer extends Component {
           <>
             {this.renderInputGroup(embedIframeHTMLCode, 'embed')}
             <p>
-              Embed Worldview in your website. See our
+              Please
               {' '}
-              <a className="share-embed-doc-link" href="https://github.com/nasa-gibs/worldview/blob/main/doc/embed.md" target="_blank" rel="noopener noreferrer">documentation</a>
+              <a onClick={this.openFeedback} id="feedback-url">contact us</a>
               {' '}
-              for a guide.
+              to enable Worldview embedding on your website.
+            </p>
+            <p>
+              View the
+              {' '}
+              <a href="https://nasa-gibs.github.io/gibs-api-docs/" target="_blank" rel="noopener noreferrer" id="api-doc-url">API documentation</a>
+              {' '}
+              to learn how to directly access the imagery via GIBS.
             </p>
           </>
         )}
       </TabPane>
     );
-  }
+  };
 
-  renderSocialTab = () => {
+  renderCiteUsTab = () => {
     const {
       activeTab,
     } = this.state;
+    const citeUsValue = 'We acknowledge the use of imagery from the NASA Worldview application (https://worldview.earthdata.nasa.gov), part of the NASA Earth Science Data and Information System (ESDIS).';
 
     return (
-      <TabPane tabId="social" className="share-tab-social">
-        {activeTab === 'social' && (
+      <TabPane tabId="cite-us" className="share-tab-cite-us">
+        {activeTab === 'cite-us' && (
           <>
-            <ShareLinks onClick={this.onLinkClick} />
-            <p>
-              Share Worldview on social media.
-            </p>
+            {this.renderTextareaGroup(citeUsValue, 'cite-us')}
           </>
         )}
       </TabPane>
     );
-  }
+  };
 
   render() {
     const {
@@ -308,35 +335,39 @@ class ShareLinkContainer extends Component {
     } = this.state;
 
     return (
-      <>
-        <div className="share-body">
-          <ShareToolTips
-            activeTab={activeTab}
-            tooltipErrorTime={tooltipErrorTime}
-            tooltipToggleTime={tooltipToggleTime}
-          />
-          <div className="share-nav-container">
-            {this.renderNavTabs()}
-            <TabContent activeTab={activeTab}>
-              {this.renderLinkTab()}
-              {this.renderEmbedTab()}
-              {this.renderSocialTab()}
-            </TabContent>
-          </div>
+      <div className={`share-body${activeTab === 'embed' ? '-tall' : ''}`}>
+        <ShareToolTips
+          activeTab={activeTab}
+          tooltipErrorTime={tooltipErrorTime}
+          tooltipToggleTime={tooltipToggleTime}
+        />
+        <div className="share-nav-container">
+          {this.renderNavTabs()}
+          <TabContent activeTab={activeTab}>
+            {this.renderLinkTab()}
+            {this.renderEmbedTab()}
+            {this.renderCiteUsTab()}
+          </TabContent>
         </div>
-      </>
+      </div>
     );
   }
 }
 
 function mapStateToProps(state) {
   const {
-    browser, config, shortLink, sidebar, tour,
+    screenSize, config, shortLink, sidebar, tour, feedback,
   } = state;
 
-  const isMobile = browser.lessThan.medium;
+  const { features: { urlShortening } } = config;
+  const isMobile = screenSize.isMobileDevice;
   const embedDisableNavLink = sidebar.activeTab === 'download' || tour.active;
+  const { features: { feedback: feedbackEnabled } } = config;
+
   return {
+    feedbackEnabled,
+    feedbackIsInitiated: feedback.isInitiated,
+    urlShortening,
     embedDisableNavLink,
     isMobile,
     shortLink,
@@ -351,6 +382,12 @@ const mapDispatchToProps = (dispatch) => ({
   requestShortLinkAction: (location, options) => dispatch(
     requestShortLink(location, 'application/json', null, options),
   ),
+  sendFeedback: (isInitiated, isMobile) => {
+    onClickFeedback(isInitiated, isMobile);
+    if (!isInitiated) {
+      dispatch(initFeedback());
+    }
+  },
 });
 
 export default connect(
@@ -360,9 +397,13 @@ export default connect(
 
 ShareLinkContainer.propTypes = {
   embedDisableNavLink: PropTypes.bool,
+  feedbackIsInitiated: PropTypes.bool,
+  feedbackEnabled: PropTypes.bool,
   isMobile: PropTypes.bool,
   mock: PropTypes.string,
   requestShortLinkAction: PropTypes.func,
   selectedDate: PropTypes.object,
+  sendFeedback: PropTypes.func,
   shortLink: PropTypes.object,
+  urlShortening: PropTypes.bool,
 };

@@ -6,10 +6,10 @@ import {
 } from 'reactstrap';
 import LayersContainer from './layers-container';
 import { toggleActiveCompareState as toggleActiveCompareStateAction } from '../../modules/compare/actions';
-import { memoizedDateMonthAbbrev } from '../../modules/compare/selectors';
+import { getCompareDates } from '../../modules/compare/selectors';
+import MonospaceDate from '../../components/util/monospace-date';
 
-const tabHeight = 32;
-const CompareCase = (props) => {
+function CompareCase(props) {
   const {
     isActive,
     dateA,
@@ -21,6 +21,7 @@ const CompareCase = (props) => {
 
   const outerClass = 'layer-container sidebar-panel';
   const tabClasses = 'ab-tab';
+
   return (
     <div className={isActive ? '' : 'hidden '}>
       <div className={outerClass}>
@@ -36,7 +37,8 @@ const CompareCase = (props) => {
                 onClick={toggleActiveCompareState}
               >
                 <i className="productsIcon selected icon-layers" />
-                {` A: ${dateA}`}
+                {' A: '}
+                <MonospaceDate date={dateA} />
               </NavLink>
             </NavItem>
             <NavItem>
@@ -49,7 +51,8 @@ const CompareCase = (props) => {
                 onClick={toggleActiveCompareState}
               >
                 <i className="productsIcon selected icon-layers" />
-                {` B: ${dateB}`}
+                {' B: '}
+                <MonospaceDate date={dateB} />
               </NavLink>
             </NavItem>
           </Nav>
@@ -58,14 +61,14 @@ const CompareCase = (props) => {
               <LayersContainer
                 isActive={isCompareA}
                 compareState="active"
-                height={height - tabHeight}
+                height={height}
               />
             </TabPane>
             <TabPane tabId="2">
               <LayersContainer
                 isActive={!isCompareA}
                 compareState="activeB"
-                height={height - tabHeight}
+                height={height}
               />
             </TabPane>
           </TabContent>
@@ -73,7 +76,7 @@ const CompareCase = (props) => {
       </div>
     </div>
   );
-};
+}
 
 const mapDispatchToProps = (dispatch) => ({
   toggleActiveCompareState: () => {
@@ -82,15 +85,17 @@ const mapDispatchToProps = (dispatch) => ({
 });
 
 const mapStateToProps = (state) => {
-  const { compare } = state;
+  const { compare, screenSize } = state;
   const { isCompareA, active } = compare;
-  const { dateA, dateB } = memoizedDateMonthAbbrev(state)();
+  const { dateA, dateB } = getCompareDates(state);
+  const isMobile = screenSize.isMobileDevice;
 
   return {
     isCompareA,
     dateA,
     dateB,
     isActive: active,
+    isMobile,
   };
 };
 

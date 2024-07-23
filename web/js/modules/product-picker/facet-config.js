@@ -41,7 +41,7 @@ export default [
     hideZeroCount: true,
   },
   {
-    field: 'facetPeriod',
+    field: 'layerPeriod',
     label: 'Period',
     filterType: 'any',
     tooltip: 'Temporal Resolution',
@@ -52,6 +52,21 @@ export default [
     label: 'Day/Night',
     filterType: 'any',
     tooltip: 'Whether the layer represents daytime or nighttime imagery or data',
+    hideZeroCount: true,
+  },
+  {
+    field: 'dataCenter',
+    label: 'DAAC/SIPS',
+    filterType: 'any',
+    tooltip: 'Distributed Active Archive Center / Science Investigator-led Processing System',
+    show: 30,
+    hideZeroCount: true,
+  },
+  {
+    field: 'type',
+    label: 'Imagery Type',
+    filterType: 'any',
+    tooltip: 'Granule-based rasters cover the spatial footprint of individual data files; mosaics assemble granules into spatially continuous maps. Vectors provide additional attribute information or flow visualizations.',
     hideZeroCount: true,
   },
 ];
